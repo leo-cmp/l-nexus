@@ -39,6 +39,10 @@
   `project_policy.r2_review`. R1 permite revisao opcional.
 - O bloco de risco e roteamento deve ficar no front matter para que a decisao
   seja visivel e validavel sem interpretar texto livre.
+- Tasks legadas com `modelo_recomendado`, `substitutos` e `motivo` devem passar
+  por `l-nexus migrate-task <task> --write`. Revise a classificacao conservadora
+  `R3/legacy-unclassified` antes da execucao; a migracao nao comprova identidade
+  nem revisao historica.
 - Ao criar nova task, use o template de `.ai/templates/task.md` como base.
 - Para tarefas L1/R1, use `.ai/templates/task-short.md`. Uma task pequena com
   risco R2 ou R3 usa obrigatoriamente o template completo.

@@ -15,6 +15,7 @@ function usage() {
   return `Usage:
   validate-task-routing.mjs <task-path> [--routing <routing-path>] [--final-commit <sha>]
   l-nexus validate-task <task-path> [--routing <routing-path>] [--final-commit <sha>]
+  l-nexus migrate-task <task-path> [--write]
 
 Validates task front matter against model-routing.yaml.`;
 }
@@ -356,6 +357,11 @@ function main() {
       const scriptName = argv[0] === 'install-force' ? 'install-force.sh' : 'install.sh';
       const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), scriptName);
       execFileSync(scriptPath, argv.slice(1), { stdio: 'inherit' });
+      return;
+    }
+    if (argv[0] === 'migrate-task') {
+      const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrate-task-routing.mjs');
+      execFileSync(process.execPath, [scriptPath, ...argv.slice(1)], { stdio: 'inherit' });
       return;
     }
     const options = parseArguments(argv);

@@ -121,6 +121,17 @@ npx @leo-cmp/l-nexus validate-task \
   --final-commit "$(git rev-parse HEAD)"
 ```
 
+Para converter o front matter de uma task legada sem inventar identidades de
+executor ou revisor, simule primeiro e aplique explicitamente:
+
+```bash
+npx @leo-cmp/l-nexus migrate-task .planning/tasks/TASK-001.md
+npx @leo-cmp/l-nexus migrate-task .planning/tasks/TASK-001.md --write
+```
+
+A migracao marca a task como `R3/legacy-unclassified` ate reclassificacao e
+revisao. O corpo Markdown nao e alterado.
+
 ---
 
 ## Versão
