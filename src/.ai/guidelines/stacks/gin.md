@@ -1,13 +1,25 @@
 # Gin Guidelines
 
-- Verifique `go.mod`, `go.work`, `sqlc.yaml`, `Makefile` e pacotes vizinhos antes
-  de decidir versoes, layout ou comandos.
-- Use Gin para HTTP, sqlc para gerar acesso tipado, `pgx/v5` para PostgreSQL e
-  Goose para migrations SQL em projetos novos.
+HTTP com Gin e acesso a dados com sqlc e pgx. Pressupoe `go.md` para regras da
+linguagem. Migrations estao em `goose.md`.
+
+## Defaults de Projeto Novo
+
+> Valem quando o projeto nao definiu outra coisa. Para divergir, registre em
+> `.ai/decisions.md` com contexto, rationale e impacto. Nao edite este arquivo
+> para acomodar um projeto especifico.
+
+- HTTP: Gin.
+- Acesso a dados: sqlc v2 com `engine: postgresql` e `sql_package: pgx/v5`.
+- Migrations: Goose, conforme `goose.md`.
+- Layout: conforme a secao Arquitetura.
+
+Regras fora deste bloco sao normativas e nao dependem de escolha de projeto.
+
+- Verifique `go.mod`, `sqlc.yaml`, `Makefile` e pacotes vizinhos antes de
+  decidir versoes, layout ou comandos.
 - Preserve ferramenta equivalente ja adotada pelo projeto. Nao mantenha duas
   bibliotecas para a mesma responsabilidade sem necessidade comprovada.
-- Use `go get` ou o comando ja documentado no repositorio para dependencias.
-  Nunca edite `go.mod` manualmente para simular instalacao.
 
 ## Arquitetura
 
@@ -26,12 +38,9 @@ queries/                 SQL de aplicacao
 
 - Em repositorio existente, siga limites equivalentes em vez de reorganizar
   pacotes sem solicitacao.
-- Monte dependencias explicitamente em `cmd/api`; evite service locator e estado
-  global mutavel.
+- Monte dependencias explicitamente em `cmd/api`; evite service locator.
 - Mantenha handlers focados em bind, validacao, chamada ao service e resposta.
 - Services nao recebem `*gin.Context` e nao conhecem status HTTP.
-- Coloque interfaces junto ao pacote consumidor. Crie interface somente quando
-  houver limite real de teste, dominio ou infraestrutura.
 - Evite repository que apenas repete, sem adaptacao, cada metodo gerado pelo
   sqlc.
 - Nao exponha DTOs HTTP ou structs geradas pelo sqlc como entidades de dominio
@@ -44,62 +53,72 @@ queries/                 SQL de aplicacao
 - Prefira `gin.New()` e registre logger e recovery explicitamente para manter
   configuracao e ordem visiveis.
 - Use DTOs tipados com tags `json`, `form` e `binding` adequadas.
-- Para endpoints JSON, prefira `ShouldBindJSON` a metodos `Bind*`, pois o handler
-  mantem controle da resposta de erro.
+- Para endpoints JSON, prefira `ShouldBindJSON` a metodos `Bind*`, pois o
+  handler mantem controle da resposta de erro.
+- Em DTO de resposta, use ponteiro quando "ausente" e diferente de "zero";
+  `omitempty` omite `0`, `""` e `false`.
 - Limite o corpo antes do binding e imponha limites proprios para uploads.
 - Valide formato no handler e regra de negocio no service.
 - Use `c.Request.Context()` ao chamar services e integracoes.
 - Use verbos e status HTTP semanticos. Rotas de criacao usam `POST`, atualizacao
-  idempotente usa `PUT`, atualizacao parcial usa `PATCH` e exclusao usa `DELETE`.
+  idempotente usa `PUT`, atualizacao parcial usa `PATCH` e exclusao usa
+  `DELETE`.
 - Retorne JSON consistente. Nao use `gin.H` como contrato publico quando um DTO
   nomeado tornar o formato mais claro e testavel.
 - Centralize traducao de erros com `errors.Is` e `errors.As`; nunca retorne
   `err.Error()` indiscriminadamente ao cliente.
 - Middleware encerra fluxo negado com `Abort*` e `return`. Registre middleware
   antes das rotas que ele protege.
+- Quando o projeto expuser contrato publico de API, mantenha as anotacoes de
+  documentacao junto ao handler e regenere a especificacao ao alterar rota ou
+  DTO.
+
+## Observabilidade
+
+- Use log estruturado com `log/slog`. Nao use `fmt.Println` nem log de texto
+  livre em codigo de producao.
+- Gere um identificador de correlacao por requisicao em middleware, inclua-o em
+  todo log daquela requisicao e devolva-o em cabecalho de resposta.
+- Registre metodo, rota, status e duracao. Nao registre corpo por padrao.
+- Exponha verificacao de vivacidade e de prontidao em rotas separadas: vivacidade
+  responde se o processo esta de pe; prontidao so responde sucesso quando as
+  dependencias obrigatorias respondem.
+- Exponha profiling apenas em rede interna, nunca em rota publica.
 
 ## Banco de Dados
 
-- Configure sqlc v2 com `engine: postgresql` e `sql_package: pgx/v5` para projetos
-  novos.
-- Mantenha migrations e queries SQL versionadas. Codigo gerado fica em pacote
+- Mantenha queries SQL versionadas em `queries/`. Codigo gerado fica em pacote
   identificado e nunca recebe edicao manual.
-- Nunca use `SELECT *` em query de producao. Liste colunas para manter contrato e
-  geracao previsiveis.
+- Nunca use `SELECT *` em query de producao. Liste colunas para manter contrato
+  e geracao previsiveis.
 - Use parametros do sqlc; concatenacao de input em SQL e proibida.
 - Propague `context.Context` em toda query.
 - Ordene listagens de modo deterministico e imponha limite de pagina.
-- Crie indices para padroes reais de `WHERE`, `JOIN` e `ORDER BY`; valide queries
-  criticas com `EXPLAIN (ANALYZE, BUFFERS)` em ambiente seguro.
+- Crie indices para padroes reais de `WHERE`, `JOIN` e `ORDER BY`; valide
+  queries criticas com `EXPLAIN (ANALYZE, BUFFERS)` em ambiente seguro.
 - Delimite transacao no caso de uso que exige atomicidade. Use `Queries.WithTx`
   e garanta rollback em todo caminho de erro.
 - Configure e feche `pgxpool.Pool`; valide conectividade no startup quando o
   banco for dependencia obrigatoria.
-
-## Migrations
-
-- Crie migrations SQL com Goose. Cada arquivo deve conter uma secao
-  `-- +goose Up` e, por padrao, `-- +goose Down` capaz de desfazer a mudanca.
-- Use prefixos de timestamp ou numeros com largura fixa. sqlc le migrations em
-  ordem lexicografica.
-- Uma migration trata uma mudanca coesa. Nao misture DDL amplo com carga de
-  dados sem necessidade.
-- Use `-- +goose NO TRANSACTION` somente para operacao PostgreSQL que nao pode
-  executar em transacao, com justificativa no arquivo.
-- Depois de alterar schema, execute migration, `sqlc generate`, `sqlc vet` e os
-  testes de aceite. Valide rollback quando ele for suportado.
+- Dimensione o pool com conta, nao com valor padrao: a soma do maximo de
+  conexoes de todas as instancias que apontam para o mesmo servidor nao pode
+  exceder o limite de conexoes dele. Defina tambem tempo de vida maximo da
+  conexao.
+- Valor monetario usa coluna `NUMERIC` e tipo decimal na aplicacao, conforme
+  `go.md`.
+- Execute `sqlc generate` e `sqlc vet` apos alterar schema ou queries.
 
 ## Concorrencia e Confiabilidade
 
-- Toda goroutine precisa de owner, cancelamento, limite e estrategia de erro.
+Regras gerais de goroutine, `context` e panic estao em `go.md`. Aqui, apenas o
+que e especifico do servidor HTTP.
+
 - Nunca use `*gin.Context` fora do ciclo sincrono do handler. Copiar o contexto
   nao transforma trabalho em job duravel.
-- Trabalho que precisa sobreviver ao processo pertence a fila ou worker
-  persistente.
-- Configure `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout` e `IdleTimeout` no
-  `http.Server` conforme o perfil da aplicacao.
-- Propague cancelamento para banco e clientes externos.
-- Configure timeout em todo cliente HTTP e sempre feche response body.
+- Configure `ReadHeaderTimeout`, `ReadTimeout`, `WriteTimeout` e `IdleTimeout`
+  no `http.Server` conforme o perfil da aplicacao.
+- Configure timeout em todo cliente HTTP de saida e sempre feche o corpo da
+  resposta.
 - Implemente shutdown gracioso com sinal, prazo finito, `Server.Shutdown` e
   fechamento do pool depois de parar novas requisicoes.
 
@@ -111,7 +130,8 @@ queries/                 SQL de aplicacao
 - Nunca registre senha, token, cookie, secret, cabecalho de autorizacao ou corpo
   sensivel.
 - Aplique limite de corpo, upload, taxa e duracao conforme risco do endpoint.
-- Use hash de senha adequado e comparacao segura. Nunca armazene senha reversivel.
+- Use hash de senha adequado e comparacao segura. Nunca armazene senha
+  reversivel.
 - Nao exponha detalhes internos em respostas de autenticacao ou erros 5xx.
 
 ## Testes e Comandos
@@ -131,13 +151,11 @@ go test ./...
 go test -race ./...
 sqlc generate
 sqlc vet
-goose -dir migrations postgres "$DATABASE_URL" up
-goose -dir migrations postgres "$DATABASE_URL" down
 ```
 
-Nao execute `down` em ambiente com dados persistentes sem confirmacao explicita.
+Comandos de migration estao em `goose.md`.
 
 ## Skills
 
 - `gin-best-practices`: use como referencia ao escrever, revisar ou refatorar
-  codigo Gin, sqlc, pgx, migrations, concorrencia, seguranca e testes.
+  codigo Gin, sqlc, pgx, concorrencia, seguranca e testes.

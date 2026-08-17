@@ -40,6 +40,11 @@ Exemplos de provas validas (adapte para a stack do projeto):
 - `phpstan analyse app/ --level=5 → exit 0 | Resumo: 0 errors`
 - `npm test → exit 0 | Resumo: 47 passed, 0 failed`
 - `python -m pytest → exit 0 | Resumo: 23 passed`
+- `go build ./... → exit 0 | Resumo: compila sem erro`
+- `go test -race ./... → exit 0 | Resumo: ok 6 pacotes, 0 falhas, sem data race`
+- `go vet ./... → exit 0 | Resumo: 0 diagnosticos`
+- `sqlc generate && sqlc vet → exit 0 | Resumo: 12 queries geradas e validadas`
+- `goose -dir migrations postgres "$DATABASE_URL" up → exit 0 | Resumo: aplicada 20260816_criar_cotas`
 
 Regras:
 - Se nao ha prova, marque o item como `⚠️ Nao verificado` na task.
@@ -70,6 +75,8 @@ O Context Canary (item 1.1) faz auto-checagem a cada 5 interacoes. O timeout de 
 
 Antes de marcar qualquer task como concluída, confirme TODOS os itens:
 
+- [ ] **Em linguagem compilada, o build passa** (`exit 0`). Codigo que nao compila nao e "quase pronto".
+- [ ] **Codigo gerado foi regenerado e commitado** quando o schema ou as queries mudaram (ex.: `sqlc generate`). Codigo gerado desatualizado quebra em runtime, nao no build.
 - [ ] Testes relacionados passam (`exit 0`)
 - [ ] **Test relevance check:** Pelo menos 1 teste cobre explicitamente o codigo alterado.
   - Confirme que o teste referencia: nome do metodo alterado, rota modificada, ou model/entidade da task.
@@ -77,7 +84,7 @@ Antes de marcar qualquer task como concluída, confirme TODOS os itens:
   - Se nenhum teste cobrir: NAO marque como verificado. Adicione teste ou marque como `⚠️ Nao verificado`.
 - [ ] Lint/formatacão passam (`exit 0`)
 - [ ] `git diff --stat` mostra apenas arquivos esperados para esta task
-- [ ] `git diff` não contém: comentários de debug, `dd()`, `var_dump()`, `console.log()`
+- [ ] `git diff` não contém: comentários de debug, `dd()`, `var_dump()`, `console.log()`, `fmt.Println` de depuração, `spew.Dump`, `//nolint` sem justificativa, `t.Skip` sem motivo
 - [ ] Nenhum arquivo de outra task foi alterado acidentalmente
 - [ ] Log de Evidências registrado na task (comando + saída + exit code)
 - [ ] Nudge de conclusão enviado ao usuario (conforme `.ai/guidelines/core/nudge.md`)

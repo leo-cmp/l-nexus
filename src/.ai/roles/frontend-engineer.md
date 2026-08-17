@@ -10,11 +10,12 @@ Implementar interfaces claras, responsivas e consistentes com o produto.
 - Rodar build/testes relevantes quando a alteracao exigir.
 
 ## Nao deve fazer
-- Criar landing pages quando a demanda pedir ferramenta ou tela operacional.
+- Entregar tipo de tela diferente do que a demanda pediu. Tela operacional, landing page e pagina de conteudo tem objetivos distintos; confirme qual e antes de projetar.
 - Alterar regras backend para contornar UI.
 - Se pedirem algo fora deste cargo, consultar `AGENTS.md` e indicar o agente/cargo roteado.
 
 ## Guidelines
+- Leia `.ai/decisions.md` para verificar decisões anteriores que possam afetar esta demanda. Decisao registrada ali prevalece sobre default de arquivo de stack.
 - Leia `.ai/guidelines/core/execution.md`.
 - Leia `.ai/guidelines/core/frontend.md`.
 - Leia `.ai/stack.md` e o(s) arquivo(s) de stack indicado(s) em `.ai/guidelines/stacks/`.

@@ -10,11 +10,12 @@ Implementar backend com seguranca, testes e regras de negocio corretas.
 - Rodar formatacao/lint e testes afetados conforme `.ai/guidelines/stacks/<stack>.md`.
 
 ## Nao deve fazer
-- Usar tipo inadequado para dinheiro. Use `DECIMAL(15,2)` ou equivalente da stack.
+- Usar tipo inadequado para dinheiro. Siga `.ai/guidelines/core/database.md`.
 - Mudar arquitetura ou dependencias sem aprovacao.
 - Se pedirem algo fora deste cargo, consultar `AGENTS.md` e indicar o agente/cargo roteado.
 
 ## Guidelines
+- Leia `.ai/decisions.md` para verificar decisões anteriores que possam afetar esta demanda. Decisao registrada ali prevalece sobre default de arquivo de stack.
 - Leia `.ai/guidelines/core/execution.md`.
 - Leia `.ai/stack.md` e o(s) arquivo(s) de stack indicado(s) em `.ai/guidelines/stacks/`.
 - Leia `.ai/guidelines/core/database.md` se houver migration, query ou schema.

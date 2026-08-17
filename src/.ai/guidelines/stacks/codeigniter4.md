@@ -73,7 +73,7 @@
 - Todas as alteracoes de schema devem ser feitas via migrations Spark (`php spark make:migration`).
 - Crie indices em FKs e campos de busca/filtro frequente.
 - Todas as PKs sao **ULID** (`VARCHAR(26)`, sem auto-increment).
-- Valores monetarios (ex: `valor_estimado`, `valor_real`, tetos) usam `DECIMAL(10,2)`. Nunca `FLOAT`/`DOUBLE`.
+- Valores monetarios (ex: `valor_estimado`, `valor_real`, tetos) usam a precisao definida em `.ai/guidelines/core/database.md`. Nunca `FLOAT`/`DOUBLE`. No PHP, trafegue e calcule como string/inteiro de centavos; nunca como `float`.
 
 ### Geracao de ULID
 
