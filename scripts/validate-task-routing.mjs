@@ -157,6 +157,9 @@ function validateRouting(routing, errors) {
     if (!['optional', 'required', 'project_policy'].includes(route.review)) {
       addError(errors, `routing.routes.${level}.review`, 'must be optional, required, or project_policy');
     }
+    if (typeof route.independent_model !== 'boolean') {
+      addError(errors, `routing.routes.${level}.independent_model`, 'must be boolean');
+    }
   }
 }
 
@@ -245,11 +248,22 @@ function validateTask(task, routing, finalCommit, errors) {
     addError(errors, 'task.model_execution.reviews', `requires an approved review of final commit ${finalCommit}`);
     return;
   }
-  if (riskLevel !== 'R3' || !isObject(executor)) return;
+  if (!isObject(executor)) return;
+
+  const route = routing.routes?.[riskLevel];
+  if (route?.independent_model) {
+    const independentModelReview = approvedFinalReviews.find(({ review }) => review.model !== executor.model);
+    if (!independentModelReview) {
+      addError(errors, 'task.model_execution.reviews', 'requires an approved review by a different model');
+      return;
+    }
+  }
+
+  if (riskLevel !== 'R3' || !routing.project_policy.r3_cross_provider) return;
 
   const independentReview = approvedFinalReviews.find(({ review }) => (
     review.model !== executor.model
-    && (!routing.project_policy.r3_cross_provider || review.provider !== executor.provider)
+    && review.provider !== executor.provider
   ));
   if (!independentReview) {
     addError(errors, 'task.model_execution.reviews', 'requires an approved R3 review by a different model and provider');

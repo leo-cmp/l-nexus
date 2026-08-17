@@ -30,10 +30,12 @@ routes:
   R1:
     executor_profile: economical
     review: optional
+    independent_model: false
   R2:
     executor_profile: balanced
     review: project_policy
     reviewer_profile: balanced
+    independent_model: true
   R3:
     executor_profile: frontier
     review: required

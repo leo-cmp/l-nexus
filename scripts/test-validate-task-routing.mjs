@@ -31,6 +31,27 @@ test('requires review when project policy requires R2 review', () => {
   assert.match(result.stderr, /requires an approved review/);
 });
 
+test('requires a different model when project policy requires R2 review', () => {
+  const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-'));
+  const taskPath = path.join(temporaryDirectory, 'r2-same-model.md');
+  try {
+    const validTask = readFileSync(path.join(scriptsDirectory, 'fixtures', 'tasks', 'r3-valid.md'), 'utf8');
+    writeFileSync(taskPath, validTask
+      .replace('complexity: L3', 'complexity: L2')
+      .replace('level: R3', 'level: R2')
+      .replaceAll('executor_profile: frontier', 'executor_profile: balanced')
+      .replace('reviewer_profile: frontier', 'reviewer_profile: balanced')
+      .replace('cross_provider_required: true', 'cross_provider_required: false')
+      .replace('model: model-reviewer', 'model: model-executor')
+      .replace('provider: provider-b', 'provider: provider-a'));
+    const result = validate('r3-valid.md', { taskPath });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /requires an approved review by a different model/);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
 test('accepts an R3 review by an independent model and provider', () => {
   const result = validate('r3-valid.md');
   assert.equal(result.status, 0, result.stderr);
@@ -39,7 +60,7 @@ test('accepts an R3 review by an independent model and provider', () => {
 test('rejects an R3 review by the executor model', () => {
   const result = validate('r3-same-model-invalid.md');
   assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /requires an approved R3 review by a different model and provider/);
+  assert.match(result.stderr, /requires an approved review by a different model/);
 });
 
 test('rejects an R3 review from the executor provider when cross-provider review is required', () => {
