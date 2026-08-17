@@ -1,3 +1,4 @@
 .threadbridge/
 .obsidian/
 nudge.db*
+node_modules/

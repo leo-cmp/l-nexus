@@ -87,6 +87,28 @@ test_docs_skill_change_releases_patch() {
     fail "tag v0.2.1 nao foi criada para skill"
 }
 
+test_docs_model_routing_change_releases_patch() {
+  local repo_dir="$TMP_DIR/repo-model-routing"
+  local origin_dir="$TMP_DIR/origin-model-routing.git"
+
+  setup_release_repo "$repo_dir" "$origin_dir"
+
+  mkdir -p "$repo_dir/.ai"
+  printf "schema_version: 1\n" > "$repo_dir/.ai/model-routing.yaml"
+  git -C "$repo_dir" add .ai/model-routing.yaml
+  git -C "$repo_dir" commit -m "docs: atualiza politica de roteamento" >/dev/null
+
+  run_release "$repo_dir" "$TMP_DIR/release-model-routing.log"
+
+  local version
+  version="$(cat "$repo_dir/VERSION")"
+  [ "$version" = "0.2.1" ] ||
+    fail "versao esperada 0.2.1 para roteamento, recebida $version"
+
+  git -C "$repo_dir" rev-parse --verify v0.2.1 >/dev/null ||
+    fail "tag v0.2.1 nao foi criada para roteamento"
+}
+
 test_docs_outside_distributed_paths_does_not_release() {
   local repo_dir="$TMP_DIR/repo-readme"
   local origin_dir="$TMP_DIR/origin-readme.git"
@@ -110,6 +132,7 @@ test_docs_outside_distributed_paths_does_not_release() {
 
 test_docs_guideline_change_releases_patch
 test_docs_skill_change_releases_patch
+test_docs_model_routing_change_releases_patch
 test_docs_outside_distributed_paths_does_not_release
 
 echo "scripts/test-release.sh: ok"

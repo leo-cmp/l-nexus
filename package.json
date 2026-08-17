@@ -9,6 +9,8 @@
     "src/",
     "scripts/install.sh",
     "scripts/install-force.sh",
+    "scripts/validate-task-routing.mjs",
+    "MODEL_REQUIREMENTS.md",
     "VERSION"
   ],
   "keywords": [

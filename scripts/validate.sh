@@ -66,6 +66,26 @@ if [ -f "$SRC/.ai/guidelines/core/planning.md" ]; then
     done
 fi
 
+echo "--- Checking model routing configuration ---"
+ROUTING_FILE="$SRC/.ai/model-routing.yaml"
+if [ ! -f "$ROUTING_FILE" ]; then
+    echo "  MISSING: .ai/model-routing.yaml"
+    echo "1" >> "$TMP"
+elif node --input-type=module -e '
+    import { readFileSync } from "node:fs";
+    import { parseDocument } from "yaml";
+    const file = process.argv[1];
+    const document = parseDocument(readFileSync(file, "utf8"));
+    if (document.errors.length > 0) {
+      throw new Error(document.errors.map((error) => error.message).join("; "));
+    }
+' "$ROUTING_FILE" >/dev/null 2>&1; then
+    echo "  OK: .ai/model-routing.yaml"
+else
+    echo "  INVALID: .ai/model-routing.yaml"
+    echo "1" >> "$TMP"
+fi
+
 ERRORS=$(wc -l < "$TMP")
 echo "=== $ERRORS errors found ==="
 exit "$ERRORS"
