@@ -314,13 +314,13 @@ Suggested i3CRM-specific R3 domains include:
 - `schema-and-rollback`;
 - `backup-and-restore`.
 
-## Go Guideline Release Precondition
+## Go Guideline Release Status
 
-At specification time, `src/.ai/guidelines/stacks/go.md` and `goose.md` exist in
-the local l-nexus worktree but are not tracked by the current Git `HEAD`. The
-routing implementation must not assume they are distributed until repository
-and package contents are verified. This is a release-integrity check, not part
-of the routing feature itself.
+The Go and Goose guidelines are tracked as of commit `fb7aa13` and included in
+l-nexus `0.5.1`. The routing implementation may therefore reference
+`src/.ai/guidelines/stacks/go.md` and `goose.md` as distributed files. Package
+contents must still be covered by the existing release validation so future
+guidelines cannot be referenced without being published.
 
 ## Acceptance Criteria
 
