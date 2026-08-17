@@ -129,10 +129,13 @@ project_policy:
 
 profiles:
   economical:
+    rank: 1
     description: "Localized, reversible work"
   balanced:
+    rank: 2
     description: "Bounded implementation and tests"
   frontier:
+    rank: 3
     description: "Architecture and high-risk work"
 
 models:
@@ -148,9 +151,12 @@ routes:
   R1:
     executor_profile: economical
     review: optional
+    independent_model: false
   R2:
     executor_profile: balanced
     review: project_policy
+    reviewer_profile: balanced
+    independent_model: true
   R3:
     executor_profile: frontier
     review: required
@@ -163,10 +169,14 @@ The distributed file contains illustrative placeholders or currently supported
 defaults, but concrete rankings are project-owned. Models are selected from
 profiles and capabilities, not by hard-coded provider preference.
 
+Profile ranks define minimum capability ordering: a higher-ranked profile may
+satisfy a lower requirement, but not the reverse.
+
 `last_evaluated` and `evidence` prevent an old opinion from looking like a
-current fact. Missing evaluation data is allowed for R1/R2 according to project
-policy, but an unevaluated model cannot satisfy an R3 frontier requirement by
-default.
+current fact. Identity `unknown` may be allowed for R1/R2 according to project
+policy, but a concrete catalog entry used for execution or approval must be
+active and evaluated. An unevaluated model cannot satisfy an R3 frontier
+requirement.
 
 ## Task Schema
 
