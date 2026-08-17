@@ -3,7 +3,7 @@
   "version": "0.5.1",
   "description": "Central portátil de configuração e diretrizes para agentes de IA — skills, roles, guidelines e templates versionados",
   "bin": {
-    "l-nexus": "scripts/install.sh"
+    "l-nexus": "scripts/validate-task-routing.mjs"
   },
   "files": [
     "src/",
@@ -25,6 +25,9 @@
     "guidelines"
   ],
   "license": "MIT",
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/leo-cmp/l-nexus"

@@ -1,0 +1,42 @@
+schema_version: 1
+project_policy:
+  r2_review: required
+  r3_cross_provider: true
+  unknown_model_identity: reject_for_r3
+profiles:
+  economical:
+    description: Local work
+    rank: 1
+  balanced:
+    description: Bounded work
+    rank: 2
+  frontier:
+    description: High-risk work
+    rank: 3
+models:
+  model-executor:
+    provider: provider-a
+    profile: frontier
+    status: active
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+  model-reviewer:
+    provider: provider-b
+    profile: frontier
+    status: active
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+routes:
+  R1:
+    executor_profile: economical
+    review: optional
+  R2:
+    executor_profile: balanced
+    review: project_policy
+    reviewer_profile: balanced
+  R3:
+    executor_profile: frontier
+    review: required
+    reviewer_profile: frontier
+    independent_model: true
+    cross_provider: project_policy
