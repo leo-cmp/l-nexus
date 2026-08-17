@@ -34,8 +34,7 @@
   sugeridos e politica de revisao. Nao fixe fornecedor como preferencia global.
 - Risco R2 ou R3 exige `risk.rationale` explicando o impacto concreto da falha.
 - Dominios listados em `risk_domains.generic_r3` sao R3 por padrao. O projeto
-  pode acrescentar dominios, mas rebaixar um dominio generico exige decisao
-  explicita em `.ai/decisions.md`.
+  pode acrescentar dominios, mas nao rebaixar um dominio R3 obrigatorio.
 - R3 sempre exige revisao independente. R2 segue
   `project_policy.r2_review`. R1 permite revisao opcional.
 - O bloco de risco e roteamento deve ficar no front matter para que a decisao
@@ -57,4 +56,3 @@ Para evitar retrabalho e ambiguidade, todo plano ou especificacao de task deve r
 3. **Regras de Validacao**: Liste explicitamente os campos obrigatorios, tipos de dados, limites de caracteres e comportamentos esperados do backend em caso de falha de validacao (ex: redirects, flash messages).
 4. **Cenarios de Teste**: Descreva pelo menos 2 cenarios de teste basicos na task: um de sucesso (happy path) e um de erro/excecao (ex: tenant diferente, dados duplicados, input vazio).
 5. **Analise de Requisitos**: Antes de propor o plano de uma fase, revise as diretrizes de regras de negocio do projeto (`.ai/guidelines/domain/business-rules/`) e identifique potenciais conflitos ou restricoes tecnicas da stack.
-
