@@ -141,6 +141,16 @@ function validateRouting(routing, errors) {
     }
   }
   if (!isObject(routing.models)) addError(errors, 'routing.models', 'must be a mapping');
+  if (!isObject(routing.risk_domains)) {
+    addError(errors, 'routing.risk_domains', 'must be a mapping');
+  } else {
+    for (const key of ['generic_r3', 'project']) {
+      const domains = routing.risk_domains[key];
+      if (!Array.isArray(domains) || domains.some((domain) => typeof domain !== 'string' || domain.trim() === '')) {
+        addError(errors, `routing.risk_domains.${key}`, 'must be an array of non-empty strings');
+      }
+    }
+  }
   if (!isObject(routing.routes)) {
     addError(errors, 'routing.routes', 'must be a mapping');
     return;
@@ -160,6 +170,26 @@ function validateRouting(routing, errors) {
     if (typeof route.independent_model !== 'boolean') {
       addError(errors, `routing.routes.${level}.independent_model`, 'must be boolean');
     }
+    if (level === 'R1' && route.review !== 'optional') {
+      addError(errors, 'routing.routes.R1.review', 'must be optional');
+    }
+    if (level === 'R2' && route.review !== 'project_policy') {
+      addError(errors, 'routing.routes.R2.review', 'must be project_policy');
+    }
+    if (level === 'R3' && route.review !== 'required') {
+      addError(errors, 'routing.routes.R3.review', 'must be required');
+    }
+    if (['R2', 'R3'].includes(level)) {
+      if (typeof route.reviewer_profile !== 'string' || !isObject(routing.profiles) || !routing.profiles[route.reviewer_profile]) {
+        addError(errors, `routing.routes.${level}.reviewer_profile`, 'must reference a configured profile');
+      }
+      if (route.independent_model !== true) {
+        addError(errors, `routing.routes.${level}.independent_model`, 'must be true when review can be required');
+      }
+    }
+    if (level === 'R3' && route.cross_provider !== 'project_policy') {
+      addError(errors, 'routing.routes.R3.cross_provider', 'must be project_policy');
+    }
   }
 }
 
@@ -176,7 +206,18 @@ function validateTask(task, routing, finalCommit, errors) {
     addError(errors, 'task.risk.level', 'must be R1, R2, or R3');
     return;
   }
-  if (!Array.isArray(task.risk.domains)) addError(errors, 'task.risk.domains', 'must be an array');
+  if (!Array.isArray(task.risk.domains)) {
+    addError(errors, 'task.risk.domains', 'must be an array');
+  } else {
+    const mandatoryR3Domains = new Set([
+      ...(routing.risk_domains?.generic_r3 ?? []),
+      ...(routing.risk_domains?.project ?? []),
+    ]);
+    const matchedDomain = task.risk.domains.find((domain) => mandatoryR3Domains.has(domain));
+    if (matchedDomain && riskLevel !== 'R3') {
+      addError(errors, 'task.risk.level', `must be R3 because domain ${matchedDomain} is configured as mandatory R3`);
+    }
+  }
   if (['R2', 'R3'].includes(riskLevel) && (typeof task.risk.rationale !== 'string' || task.risk.rationale.trim() === '')) {
     addError(errors, 'task.risk.rationale', 'is required for R2 and R3');
   }
@@ -208,6 +249,9 @@ function validateTask(task, routing, finalCommit, errors) {
   }
   const executor = task.model_execution.executor;
   validateIdentity(errors, executor, 'task.model_execution.executor', { requireKnown: riskLevel === 'R3' });
+  if (isObject(executor) && (typeof executor.started_at !== 'string' || executor.started_at.trim() === '')) {
+    addError(errors, 'task.model_execution.executor.started_at', 'must be a non-empty string');
+  }
   validateCatalogModel(errors, executor, 'task.model_execution.executor', routing, routing.routes?.[riskLevel]?.executor_profile);
   const reviews = task.model_execution.reviews;
   if (!Array.isArray(reviews)) {

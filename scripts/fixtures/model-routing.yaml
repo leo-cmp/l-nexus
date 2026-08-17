@@ -26,6 +26,17 @@ models:
     status: active
     last_evaluated: "2026-08-16"
     evidence: Local evaluation
+risk_domains:
+  generic_r3:
+    - authentication-authorization
+    - secrets-cryptography
+    - payments-money
+    - destructive-data-migrations
+    - personal-data-lifecycle
+    - tenant-account-isolation
+    - backup-restore-deployment
+    - material-concurrency-idempotency
+  project: []
 routes:
   R1:
     executor_profile: economical

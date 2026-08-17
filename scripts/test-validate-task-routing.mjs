@@ -25,6 +25,20 @@ test('accepts R1 work without review', () => {
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('rejects a task that downgrades a mandatory R3 domain', () => {
+  const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-'));
+  const taskPath = path.join(temporaryDirectory, 'downgraded-risk.md');
+  try {
+    const task = readFileSync(path.join(scriptsDirectory, 'fixtures', 'tasks', 'r1-valid.md'), 'utf8');
+    writeFileSync(taskPath, task.replace('domains: [documentation]', 'domains: [payments-money]'));
+    const result = validate('r1-valid.md', { taskPath });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /must be R3 because domain payments-money is configured as mandatory R3/);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
 test('requires review when project policy requires R2 review', () => {
   const result = validate('r2-review-required-invalid.md');
   assert.notEqual(result.status, 0);
@@ -87,6 +101,42 @@ test('rejects unknown executor identity for R3', () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /task\.model_execution\.executor\.model: must be known/);
     assert.match(result.stderr, /task\.model_execution\.executor\.provider: must be known/);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('requires executor start time', () => {
+  const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-'));
+  const taskPath = path.join(temporaryDirectory, 'missing-started-at.md');
+  try {
+    const task = readFileSync(path.join(scriptsDirectory, 'fixtures', 'tasks', 'r3-valid.md'), 'utf8');
+    writeFileSync(taskPath, task.replace('started_at: 2026-08-16 10:00', 'started_at: ""'));
+    const result = validate('r3-valid.md', { taskPath });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task\.model_execution\.executor\.started_at: must be a non-empty string/);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('rejects routing that makes R3 review optional', () => {
+  const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-'));
+  const routingPath = path.join(temporaryDirectory, 'invalid-routing.yaml');
+  try {
+    const routingContents = readFileSync(routing, 'utf8');
+    writeFileSync(routingPath, routingContents.replace(
+      /R3:\n([\s\S]*?)review: required/,
+      (match) => match.replace('review: required', 'review: optional'),
+    ));
+    const result = spawnSync(process.execPath, [
+      validator,
+      path.join(scriptsDirectory, 'fixtures', 'tasks', 'r3-valid.md'),
+      '--routing', routingPath,
+      '--final-commit', 'abc1234',
+    ], { encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /routing\.routes\.R3\.review: must be required/);
   } finally {
     rmSync(temporaryDirectory, { recursive: true, force: true });
   }
