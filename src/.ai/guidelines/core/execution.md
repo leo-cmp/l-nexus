@@ -3,6 +3,11 @@
 - Ao iniciar uma task, marque a task e `plan.md` como `Em execucao` quando aplicavel.
 - Siga `.ai/guidelines/core/environment.md` antes de escolher comandos de execucao local.
 - Antes de implementar task executavel, confirme que esta em branch propria da task e nao em branch de PR ja mergeado.
+- Antes de modificar codigo, preencha `model_execution.executor` com agente,
+  provedor, modelo exato e instante de inicio. Use `unknown` quando o runtime nao
+  expuser a identidade; nunca infira.
+- Confirme que o executor satisfaz o perfil exigido em `model_plan` e
+  `.ai/model-routing.yaml`. Identidade `unknown` nao executa R3 por padrao.
 - Nao inicie task que depende de outra task cujo PR ainda nao foi mergeado na branch principal (develop/main). Se houver dependencia aberta, pare e avise o usuario.
 - Nao execute pedido generico como "conforme planejado"; exija caminho de task em `.planning/PLAN_VN/tasks/*.md`.
 - Se criar ou alterar migrations/seeders, rode-os conforme `.ai/guidelines/stacks/<stack>.md` antes dos testes de aceite.
@@ -17,6 +22,12 @@
 - Marque entregaveis concluidos com `[x]` apenas depois de implementar e verificar.
 - Ao concluir, atualize status da task, progresso/listas em `plan.md` e issue GitHub vinculada.
 - Ao concluir task executavel, encaminhe para PR proprio com `Task X.Y` no titulo.
+- Antes de concluir, valide a politica de roteamento da task. R3 exige parecer
+  aprovado de modelo diferente sobre o commit final e, quando configurado, de
+  provedor diferente. R2 segue `project_policy.r2_review`.
+- Auto-review do executor nao conta como revisao independente.
+- Commit de codigo posterior ao commit registrado pelo revisor invalida o
+  parecer e exige nova revisao.
 - Se houver falha ou bloqueio, registre na task e comente na issue em vez de marcar concluida.
 - O relatorio final deve citar comandos rodados, incluindo migrate/seed quando aplicavel, resultado, arquivos de plano atualizados e issue.
 - **PARE E PERGUNTE**: Diante de qualquer ambiguidade, conflito entre especificacao e codigo existente, falta de informacao ou decisao com multiplos caminhos possiveis, PARE imediatamente e pergunte ao usuario. E preferivel interromper o trabalho e aguardar do que supor errado.
@@ -87,6 +98,7 @@ Antes de marcar qualquer task como concluída, confirme TODOS os itens:
 - [ ] `git diff` não contém: comentários de debug, `dd()`, `var_dump()`, `console.log()`, `fmt.Println` de depuração, `spew.Dump`, `//nolint` sem justificativa, `t.Skip` sem motivo
 - [ ] Nenhum arquivo de outra task foi alterado acidentalmente
 - [ ] Log de Evidências registrado na task (comando + saída + exit code)
+- [ ] Politica de modelo validada para a task; revisao obrigatoria cobre o commit final
 - [ ] Nudge de conclusão enviado ao usuario (conforme `.ai/guidelines/core/nudge.md`)
 - [ ] Skill `revisar` executada: 3/3 perguntas passaram
 - [ ] `plan.md` atualizado com progresso da task

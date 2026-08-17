@@ -54,7 +54,7 @@ Se o humano iniciar a mensagem com um dos comandos abaixo, a IA deve carregar a 
 
 ## Níveis de Complexidade
 
-Antes de executar qualquer fluxo, classifique a demanda:
+Antes de executar qualquer fluxo, classifique a complexidade da demanda:
 
 | Nível | Gatilho | Fluxo |
 |-------|---------|-------|
@@ -65,6 +65,21 @@ Antes de executar qualquer fluxo, classifique a demanda:
 Se houver dúvida entre níveis, suba um nível (ex: duvida L1/L2 → L2).
 
 Se L3: aplique também os circuit breakers (máx 10 arquivos, máx 5 skills, máx 3 tentativas por critério).
+
+## Níveis de Risco
+
+Complexidade mede escopo. Risco mede o impacto de uma implementacao errada. Uma
+task pode ser `L1/R3` ou `L3/R1`.
+
+| Nivel | Impacto | Revisao |
+|-------|---------|---------|
+| **R1 — Baixo** | Local, reversivel e sem efeito material | Opcional |
+| **R2 — Material** | Afeta comportamento ou operacao relevante | Conforme `.ai/model-routing.yaml` |
+| **R3 — Critico** | Seguranca, dinheiro, dados, isolamento ou efeito irreversivel | Independente obrigatoria |
+
+Consulte `.ai/model-routing.yaml` para dominios, perfis elegiveis e politica de
+revisao. Quantidade de arquivos nunca reduz o risco. Se o modelo exato nao for
+exposto pelo runtime, registre `unknown`; nao infira.
 
 ## Fast-Track (L1 — Trivial)
 
@@ -82,6 +97,7 @@ Se a demanda atender TODOS os critérios abaixo, pule o fluxo normal e execute d
 - Sem criação de schema novo (tabela/nova entidade)
 - Sem regra de negócio envolvida
 - Sem alteração de interface pública (API/rota)
+- Risco classificado como R1
 
 Fluxo fast-track:
 1. Confirme o arquivo alvo existe
@@ -96,13 +112,14 @@ Se QUALQUER dúvida surgir durante o fast-track, aborte e siga o fluxo normal.
 
 
 1. Identifique a natureza da demanda atual.
-2. Leia `.ai/roles/index.md`.
-3. Leia apenas o arquivo do cargo aplicavel.
-4. Leia somente as guidelines indicadas pelo cargo ou pela demanda.
-5. Verifique as skills listadas na role: para cada skill, confirme que o diretorio existe em `.agents/skills/<skill>/`.
+2. Classifique complexidade e risco conforme `.ai/model-routing.yaml`.
+3. Leia `.ai/roles/index.md`.
+4. Leia apenas o arquivo do cargo aplicavel.
+5. Leia somente as guidelines indicadas pelo cargo ou pela demanda.
+6. Verifique as skills listadas na role: para cada skill, confirme que o diretorio existe em `.agents/skills/<skill>/`.
    - Se existir: carregue quando necessario.
    - Se NAO existir: ignore a skill (nao tente carregar) e mencione no inicio da execucao: "Role referencia skill `<skill>` que nao existe no projeto."
-6. Carregue a skill `caveman` (`.agents/skills/caveman/SKILL.md`) — ela está no próprio l-nexus.
+7. Carregue a skill `caveman` (`.agents/skills/caveman/SKILL.md`) — ela está no próprio l-nexus.
 
 Nao carregue todos os cargos nem todas as guidelines por padrao.
 

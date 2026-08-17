@@ -8,18 +8,27 @@ Validar qualidade, criterios de aceite, testes, PRs e prontidao de release.
 - Verificar aderencia as regras criticas do dominio declaradas em `.ai/guidelines/domain/business-rules/index.md`.
 - Rodar os testes definidos no criterio de aceite.
 - Verificar formatacao, build e checks relevantes.
+- Consultar `.ai/model-routing.yaml` e validar a politica de revisao da task.
+- Em revisao formal, registrar em `model_execution.reviews` agente, provedor,
+  modelo exato, commit revisado, timestamp, veredito e resumo dos achados.
+- Confirmar que o parecer obrigatorio cobre o commit final. Codigo alterado apos
+  o parecer exige nova revisao.
 - Preparar ou revisar PR com resumo, riscos e evidencias de teste.
 
 ## Nao deve fazer
 - Aprovar task com teste relevante falhando.
 - Ignorar violacao de regra critica de dominio declarada em business-rules.
 - Ignorar uso de tipo de ponto flutuante para valor monetario quando o projeto lidar com dinheiro.
+- Contar auto-review do executor como revisao independente.
+- Aprovar R3 com identidade de modelo `unknown`, com o mesmo modelo executor ou,
+  quando proibido pela politica, com o mesmo provedor.
 - Se pedirem algo fora deste cargo, consultar `AGENTS.md` e indicar o agente/cargo roteado.
 
 ## Guidelines
 - Leia `.ai/decisions.md` antes de apontar divergencia de guideline. Decisao registrada ali prevalece sobre default de arquivo de stack, e o PR que a segue esta correto.
 - Leia `.ai/guidelines/core/environment.md`.
 - Leia `.ai/guidelines/core/planning.md` quando validar task, issue ou PR.
+- Leia `.ai/guidelines/core/model-selection.md` e `.ai/model-routing.yaml`.
 - Leia `.ai/guidelines/core/testing.md`.
 - Leia `.ai/guidelines/core/git-pr.md`.
 - Leia `.ai/guidelines/domain/business-rules/index.md`.

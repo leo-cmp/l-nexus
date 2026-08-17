@@ -27,7 +27,12 @@ Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova 
      - **Origem de Dados**: Tabelas, endpoints de API e relacionamentos envolvidos.
      - **Regras de Validação**: Campos obrigatórios, limites de dados e comportamento em erros de entrada.
      - **Cenários de Teste**: Descrever cenários de sucesso (happy path) e falha/limites.
-     - **Recomendação de Modelo**: Declarar no cabeçalho o modelo sugerido, cargo recomendado (role) e motivo.
+     - **Complexidade e Risco**: Classificar `complexity` e `risk` separadamente,
+       listar dominios e explicar o impacto concreto de falha em R2/R3.
+     - **Plano de Modelos**: Consultar `.ai/model-routing.yaml` e preencher
+       `model_plan.created_by`, perfil de executor, modelos sugeridos, perfil de
+       revisor e politica de independencia. Usar `unknown` para identidade nao
+       exposta, nunca inferir.
      - **Atomic Design** (se `.ai/project.md` § Stack tiver o bullet `**Atomic Design:**` marcando o projeto como obrigatório): leia `.ai/guidelines/core/atomic-design.md` e siga a seção "No planejamento da task" ao pé da letra — liste no Plano de Execução, por camada (Atoms/Molecules/Organisms/Templates/Pages), quais componentes novos serão criados e quais existentes serão reaproveitados.
 
 4. **Criar a Issue no GitHub:**
@@ -36,7 +41,9 @@ Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova 
    - Se vazio, monte o corpo da issue:
      - **Historia**: infira "Como [persona], quero [ação], para [benefício]" a partir do `Objetivo` da task e confirme com o humano antes de criar (não assuma silenciosamente).
      - **Criterios de Aceite**: copie da seção homônima da task.
-     - **Contexto Tecnico**: link do `plan.md`, caminho da task local, modelo recomendado e cargo.
+     - **Contexto Tecnico**: link do `plan.md`, caminho da task local,
+       complexidade, risco, perfil/modelos sugeridos, politica de revisao e
+       cargo.
    - Busque por uma Issue existente com título igual a `[Task X.Y] Título descritivo`. Se encontrar, vincule em vez de duplicar.
    - Se não existir, crie com `gh issue create --title "[Task X.Y] Título descritivo" --milestone "VN - Nome da fase" --body "..."` e salve a URL retornada no campo `issue:` do cabeçalho da task.
    - Se a chamada ao `gh` falhar (auth, rede, permissão), pare e avise o humano — nunca prossiga sem o vínculo da issue.
