@@ -4,11 +4,30 @@ title: "[Titulo descritivo]"
 created_at: YYYY-MM-DD HH:mm
 updated_at: YYYY-MM-DD HH:mm
 status: backlog
-assignee: claude | codex | gemini | copilot
+assignee: "[agente responsavel]"
 cargo: "[cargo do AGENTS.md]"
-modelo_recomendado: "[modelo]"
-substitutos: "[modelos alternativos]"
-motivo: "[justificativa da escolha]"
+complexity: "[L1 | L2 | L3]"
+risk:
+  level: "[R1 | R2 | R3]"
+  domains: []
+  rationale: "[impacto caso a implementacao esteja errada]"
+model_plan:
+  created_by:
+    agent: "[agente]"
+    provider: "[provedor ou unknown]"
+    model: "[modelo exato ou unknown]"
+  executor_profile: "[economical | balanced | frontier]"
+  suggested_models: []
+  reviewer_profile: "[economical | balanced | frontier]"
+  review_required: "[true | false]"
+  cross_provider_required: "[true | false]"
+model_execution:
+  executor:
+    agent: ""
+    provider: ""
+    model: ""
+    started_at: ""
+  reviews: []
 issue: "[URL da issue GitHub]"
 ---
 

@@ -1,0 +1,54 @@
+schema_version: 1
+
+# Este arquivo pertence ao projeto depois da instalacao. Atualizacoes do
+# l-nexus nao devem sobrescrever escolhas, avaliacoes ou dominios locais.
+project_policy:
+  r2_review: optional
+  r3_cross_provider: true
+  unknown_model_identity: reject_for_r3
+
+profiles:
+  economical:
+    description: Trabalho localizado, reversivel e de baixo risco.
+  balanced:
+    description: Implementacao delimitada, integracoes e testes usuais.
+  frontier:
+    description: Arquitetura, investigacao dificil e trabalho de alto risco.
+
+# Preencha com os modelos disponiveis e avaliados no projeto. Exemplo:
+# models:
+#   provider-model-version:
+#     provider: provider
+#     profile: balanced
+#     status: active
+#     capabilities: [backend, tests]
+#     last_evaluated: YYYY-MM-DD
+#     evidence: "resultado de avaliacao local"
+models: {}
+
+risk_domains:
+  generic_r3:
+    - authentication-authorization
+    - secrets-cryptography
+    - payments-money
+    - destructive-data-migrations
+    - personal-data-lifecycle
+    - tenant-account-isolation
+    - backup-restore-deployment
+    - material-concurrency-idempotency
+  project: []
+
+routes:
+  R1:
+    executor_profile: economical
+    review: optional
+  R2:
+    executor_profile: balanced
+    review: project_policy
+    reviewer_profile: balanced
+  R3:
+    executor_profile: frontier
+    review: required
+    reviewer_profile: frontier
+    independent_model: true
+    cross_provider: project_policy

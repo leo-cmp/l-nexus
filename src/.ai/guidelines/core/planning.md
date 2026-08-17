@@ -25,11 +25,24 @@
 - Toda demanda que virar trabalho deve ter task local antes de ir para execucao.
 - Toda task local deve ter issue vinculada (GitHub ou local) antes de ir para execucao, salvo bloqueio explicito.
 - Ao criar task, atualize `plan.md` com status, issue, progresso/listas e ordem de execucao.
-- Toda task executavel deve declarar no cabecalho: `Modelo recomendado`, `Substitutos se Anthropic indisponivel`, `Cargo recomendado` e `Motivo`.
-- O bloco de recomendacao deve ficar antes de `Prioridade` ou do primeiro contexto da task, para que o roteamento de execucao seja visivel sem ler a task inteira.
-- Use modelo forte para tasks que cruzam backend, frontend, regras financeiras, schema, integracoes ou muitos testes; use modelo economico para alteracoes pequenas, localizadas e reversiveis.
+- Toda task executavel deve declarar no cabecalho `complexity`, `risk`,
+  `model_plan` e `model_execution`, conforme `.ai/templates/task.md`.
+- Complexidade mede escopo e coordenacao; risco mede a consequencia de uma
+  implementacao incorreta. Classifique os dois e nunca use quantidade de
+  arquivos como substituto do risco.
+- Consulte `.ai/model-routing.yaml` para resolver perfil de executor, modelos
+  sugeridos e politica de revisao. Nao fixe fornecedor como preferencia global.
+- Risco R2 ou R3 exige `risk.rationale` explicando o impacto concreto da falha.
+- Dominios listados em `risk_domains.generic_r3` sao R3 por padrao. O projeto
+  pode acrescentar dominios, mas rebaixar um dominio generico exige decisao
+  explicita em `.ai/decisions.md`.
+- R3 sempre exige revisao independente. R2 segue
+  `project_policy.r2_review`. R1 permite revisao opcional.
+- O bloco de risco e roteamento deve ficar no front matter para que a decisao
+  seja visivel e validavel sem interpretar texto livre.
 - Ao criar nova task, use o template de `.ai/templates/task.md` como base.
-- Para tarefas L1 (≤2 arquivos, sem regra de negócio), use o template `.ai/templates/task-short.md` (15 linhas).
+- Para tarefas L1/R1, use `.ai/templates/task-short.md`. Uma task pequena com
+  risco R2 ou R3 usa obrigatoriamente o template completo.
 - Ao criar task, verifique se o escopo estimado ultrapassa 10 arquivos. Se sim, quebre em sub-tasks antes de criar a task.
 - O campo `Plano de Execucao` da task deve listar os arquivos esperados.
 - Toda task deve ter `created_at` preenchido na criacao e `updated_at` atualizado a cada mudanca de status ou progresso significativo.
@@ -44,5 +57,4 @@ Para evitar retrabalho e ambiguidade, todo plano ou especificacao de task deve r
 3. **Regras de Validacao**: Liste explicitamente os campos obrigatorios, tipos de dados, limites de caracteres e comportamentos esperados do backend em caso de falha de validacao (ex: redirects, flash messages).
 4. **Cenarios de Teste**: Descreva pelo menos 2 cenarios de teste basicos na task: um de sucesso (happy path) e um de erro/excecao (ex: tenant diferente, dados duplicados, input vazio).
 5. **Analise de Requisitos**: Antes de propor o plano de uma fase, revise as diretrizes de regras de negocio do projeto (`.ai/guidelines/domain/business-rules/`) e identifique potenciais conflitos ou restricoes tecnicas da stack.
-
 
