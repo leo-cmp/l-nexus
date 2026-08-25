@@ -3,10 +3,11 @@
   "version": "0.6.0",
   "description": "Central portátil de configuração e diretrizes para agentes de IA — skills, roles, guidelines e templates versionados",
   "bin": {
-    "l-nexus": "scripts/validate-task-routing.mjs"
+    "l-nexus": "scripts/cli.mjs"
   },
   "files": [
     "src/",
+    "scripts/cli.mjs",
     "scripts/install.sh",
     "scripts/install-force.sh",
     "scripts/validate-task-routing.mjs",
