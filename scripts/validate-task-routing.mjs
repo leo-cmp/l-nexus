@@ -2,9 +2,7 @@
 
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import process from 'node:process';
-import { fileURLToPath } from 'node:url';
 import { parseDocument } from 'yaml';
 
 const SUPPORTED_SCHEMA_VERSION = 1;
@@ -353,17 +351,6 @@ export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing
 function main() {
   try {
     const argv = process.argv.slice(2);
-    if (argv[0] === 'install' || argv[0] === 'install-force') {
-      const scriptName = argv[0] === 'install-force' ? 'install-force.sh' : 'install.sh';
-      const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), scriptName);
-      execFileSync(scriptPath, argv.slice(1), { stdio: 'inherit' });
-      return;
-    }
-    if (argv[0] === 'migrate-task') {
-      const scriptPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'migrate-task-routing.mjs');
-      execFileSync(process.execPath, [scriptPath, ...argv.slice(1)], { stdio: 'inherit' });
-      return;
-    }
     const options = parseArguments(argv);
     if (options.help) {
       console.log(usage());

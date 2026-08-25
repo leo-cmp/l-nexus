@@ -3,6 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 TMP_DIR="$(mktemp -d)"
+CLI="$ROOT_DIR/scripts/cli.mjs"
 
 cleanup() {
     rm -rf "$TMP_DIR"
@@ -17,7 +18,7 @@ fail() {
 TARGET="$TMP_DIR/project"
 mkdir -p "$TARGET"
 
-node "$ROOT_DIR/scripts/validate-task-routing.mjs" install "$TARGET" >/dev/null
+"$CLI" install "$TARGET" >/dev/null
 
 [ -f "$TARGET/.ai/model-routing.yaml" ] ||
     fail "model-routing.yaml nao foi criado na primeira instalacao"
@@ -32,11 +33,11 @@ project_policy:
 custom_marker: preserve-me
 EOF
 
-node "$ROOT_DIR/scripts/validate-task-routing.mjs" install "$TARGET" >/dev/null
+"$CLI" install "$TARGET" >/dev/null
 grep -q "custom_marker: preserve-me" "$TARGET/.ai/model-routing.yaml" ||
     fail "install sobrescreveu a politica do projeto"
 
-node "$ROOT_DIR/scripts/validate-task-routing.mjs" install-force "$TARGET" >/dev/null
+"$CLI" install-force "$TARGET" >/dev/null
 grep -q "custom_marker: preserve-me" "$TARGET/.ai/model-routing.yaml" ||
     fail "install-force sobrescreveu a politica do projeto"
 

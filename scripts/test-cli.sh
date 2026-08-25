@@ -45,6 +45,12 @@ grep -q "Unknown command: unknown-command" "$TMP_DIR/unknown.log" ||
 grep -q "Validates task front matter" "$TMP_DIR/validate-help.log" ||
   fail "validate-task was not dispatched"
 
+if "$CLI" validate-task "$TMP_DIR/missing-task.md" > "$TMP_DIR/validate-error.log" 2>&1; then
+  fail "validate-task failure returned success"
+fi
+grep -q "Task routing validation failed" "$TMP_DIR/validate-error.log" ||
+  fail "validate-task error output was not forwarded"
+
 "$CLI" migrate-task --help > "$TMP_DIR/migrate-help.log"
 grep -q "Migrates legacy routing metadata" "$TMP_DIR/migrate-help.log" ||
   fail "migrate-task was not dispatched"

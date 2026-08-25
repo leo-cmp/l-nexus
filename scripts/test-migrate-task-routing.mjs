@@ -9,6 +9,7 @@ import { parse } from 'yaml';
 import { migrateTaskContents } from './migrate-task-routing.mjs';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
+const cli = path.join(scriptsDirectory, 'cli.mjs');
 const migrator = path.join(scriptsDirectory, 'migrate-task-routing.mjs');
 const body = '# Legacy task\n\nKeep  trailing spaces.  \n- [ ] unchanged\n';
 const legacyTask = `---
@@ -75,7 +76,7 @@ test('--write updates once and the package subcommand is idempotent', () => {
     assert.notEqual(migrated, legacyTask);
 
     const secondResult = spawnSync(process.execPath, [
-      path.join(scriptsDirectory, 'validate-task-routing.mjs'),
+      cli,
       'migrate-task', taskPath, '--write',
     ], { encoding: 'utf8' });
     assert.equal(secondResult.status, 0, secondResult.stderr);
