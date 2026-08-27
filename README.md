@@ -14,10 +14,11 @@ npx @leo-cmp/l-nexus install
 | Componente | Descrição |
 |-----------|-----------|
 | **Roles** | Backend, frontend, fullstack, database, QA, tech-lead, product-analyst, project-planner, model-router |
-| **Skills** | Planejamento, execução, revisão, handoff, manutenção do projeto e práticas de stack |
-| **Guidelines** | Regras centrais e práticas específicas para as stacks suportadas |
+| **Skills** | Planejamento, execução, revisão, TDD, debugging sistemático, verificação de evidências, handoff e configuração CLI |
+| **Subagentes** | Templates e protocolo de isolamento para research, coder, reviewer e qa-tester |
+| **Guidelines** | Regras centrais, delegação por terminal CLI e práticas específicas de stacks |
 | **Templates** | plan.md, task.md, task-short.md, issue-local.md |
-| **Roteamento por risco** | Complexidade L1-L3, risco R1-R3, perfis avaliados e revisão independente |
+| **Roteamento & CLI Delegation** | Complexidade L1-L3, risco R1-R3, runners configuráveis (`codex`, `claude`, `opencode`, `agy`, etc.) e revisão independente |
 | **MCP** | context7, github, sequential-thinking, chrome-devtools, daisyui-github, nudge |
 | **Circuit breakers** | Max 5 skills/sessão, max 3 tentativas/critério, max 10 arquivos/task, loop detection |
 | **Memória entre sessões** | session-memory.md + decisions.md (zero dependência externa) |
@@ -54,18 +55,19 @@ projeto/
 ├── CLAUDE.md              ← idêntico ao AGENTS.md
 ├── .ai/
 │   ├── roles/             ← cargos especializados
+│   ├── subagents/         ← templates e protocolo de subagentes isolados
 │   ├── guidelines/
-│   │   ├── core/          ← execution, planning, git-pr, testing, etc.
+│   │   ├── core/          ← execution, planning, cli-delegation, git-pr, testing, etc.
 │   │   ├── stacks/        ← práticas por linguagem e framework
 │   │   └── domain/        ← regras de negócio do projeto
 │   ├── templates/         ← plan, task, task-short, issue-local
 │   ├── project.md         ← config do projeto (preenchido por você)
 │   ├── stack.md           ← stacks ativas (preenchido por você)
-│   ├── model-routing.yaml ← modelos, perfis e política de revisão do projeto
+│   ├── model-routing.yaml ← modelos, perfis, runners CLI e política de revisão
 │   ├── session-memory.md  ← handoff entre sessões
 │   └── decisions.md       ← índice de decisões do projeto
 ├── .agents/
-│   └── skills/            ← fluxos e práticas especializadas
+│   └── skills/            ← fluxos, gating (TDD, Debugging, Verification) e práticas
 ├── .claude/
 │   └── skills -> ../.agents/skills
 └── .mcp.json              ← servidores MCP
@@ -78,12 +80,14 @@ projeto/
 | Atalho | Ação |
 |--------|------|
 | `/l-nexus:iniciar` | Bootstrap do projeto (project.md, stack.md, regras) |
+| `/l-nexus:configurar-roteamento` | Configurar interativamente model-routing.yaml e executores de terminal CLI |
 | `/l-nexus:criar-plano` | Criar plano de fase |
 | `/l-nexus:criar-task` | Criar task detalhada |
 | `/l-nexus:atualizar` | Atualizar regras de negócio |
 | `/l-nexus:atualizar-l-nexus` | Atualizar l-nexus para versão mais recente |
 | `/l-nexus:brainstorm-lite` | Brainstorming rápido (3 perguntas máx) |
 | `/l-nexus:gerar-prompt` | Gerar prompt limpo para nova sessão |
+
 
 ---
 

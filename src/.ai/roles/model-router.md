@@ -40,4 +40,7 @@ Envie para o [AGENTE]:
 
 ## Guidelines
 - Leia `.ai/guidelines/core/model-selection.md`.
+- Leia `.ai/guidelines/core/cli-delegation.md` quando a execução for delegada a CLIs externas no terminal (`codex`, `claude`, `opencode`, `agy`, `gemini`, `ollama`).
 - Leia `.ai/guidelines/core/planning.md` quando o pedido mencionar plano, task, issue ou milestone.
+- Utilize a skill `configurar-roteamento` (`/l-nexus:configurar-roteamento`) caso o projeto precise ajustar modelos e templates de CLI.
+

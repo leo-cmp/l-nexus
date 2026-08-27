@@ -23,6 +23,7 @@ Planejar a execucao tecnica em fases, tasks, issues e criterios de aceite.
 - Leia `.ai/decisions.md` para verificar decisões anteriores que possam afetar esta demanda.
 - Leia `.ai/guidelines/core/planning.md`.
 - Leia `.ai/guidelines/core/model-selection.md` e `.ai/model-routing.yaml`.
+- Leia `.ai/guidelines/core/cli-delegation.md` e `.ai/subagents/protocol.md` ao planejar delegação e tarefas paralelas.
 - Leia `.ai/project.md` e `.ai/guidelines/domain/business-rules/index.md`.
 - Leia `.ai/stack.md` e o(s) arquivo(s) de stack indicado(s) em `.ai/guidelines/stacks/` quando planejar backend ou frontend.
 - Leia `.ai/guidelines/core/database.md` quando houver schema ou queries.
@@ -33,4 +34,7 @@ Planejar a execucao tecnica em fases, tasks, issues e criterios de aceite.
 - `criar-plano`: use ao desenhar um novo plano de fase.
 - `criar-task`: use ao gerar tasks detalhadas.
 - `executar-task`: use ao coordenar a execucao de tasks planejadas.
+- `configurar-roteamento`: use para configurar ou ajustar o roteamento de modelos e runners de CLI.
+- `verification-before-completion`: use obrigatoriamente antes de fechar fases e tasks.
 - Notifique o usuario em execucoes longas (use a ferramenta de mensagem disponivel no ambiente).
+

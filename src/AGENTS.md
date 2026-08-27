@@ -40,6 +40,7 @@ Se o humano iniciar a mensagem com um dos comandos abaixo, a IA deve carregar a 
 - `/l-nexus:criar-plano` ou `/l-nexus:criar-plano-fase`: Ativa a skill `criar-plano` para desenhar o plano de uma nova fase local (`.planning/PLAN_VN/plan.md`).
 - `/l-nexus:criar-task` ou `/l-nexus:criar-tarefa`: Ativa a skill `criar-task` para gerar uma nova tarefa em `.planning/PLAN_VN/tasks/task_X_Y.md` usando o template.
 - `/l-nexus:atualizar` ou `/l-nexus:atualizar-projeto`: Ativa a skill `atualizar-projeto` para sincronizar novas regras de negócio ou alterações de escopo em `.ai/project.md`.
+- `/l-nexus:configurar-roteamento` ou `/l-nexus:configurar-cli`: Ativa a skill `configurar-roteamento` para configurar interativamente `.ai/model-routing.yaml` e as diretrizes de delegação de CLIs via terminal (`.ai/guidelines/core/cli-delegation.md`).
 - `/l-nexus:brainstorm-lite`: Ativa a skill `brainstorming-lite` para tarefas L2.
 - `/l-nexus:atualizar-l-nexus`: Ativa a skill `atualizar-l-nexus` para atualizar o l-nexus para a versao mais recente.
 - `/l-nexus:gerar-prompt`: Ativa a skill `gerar-prompt` para gerar prompt de continuacao para nova sessao.
@@ -51,6 +52,13 @@ Se o humano iniciar a mensagem com um dos comandos abaixo, a IA deve carregar a 
 > - Para tarefas complexas (L3), use `brainstorming` — spec document + visual companion opcional.
 > - Para tarefas padrão (L2), use `brainstorming-lite` — 3 perguntas máx.
 > - Para tarefas triviais (L1), fast-track direto.
+> - **Gating & Disciplina Obrigatória:**
+>   - Bugs ou falhas: ative `systematic-debugging` antes de propor correção.
+>   - Novas features/código: aplique o ciclo TDD com `test-driven-development`.
+>   - Antes de concluir: valide com evidências reais via `verification-before-completion`.
+> - **Subagentes & Delegação:**
+>   - Para isolamento de tarefas ou subagentes, consulte `.ai/subagents/protocol.md`.
+>   - Para delegação a CLIs externas no terminal (`codex`, `claude`, `opencode`, `agy`, etc.), consulte `.ai/guidelines/core/cli-delegation.md`.
 
 ## Níveis de Complexidade
 

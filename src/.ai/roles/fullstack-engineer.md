@@ -17,6 +17,7 @@ Implementar tasks que atravessam backend e frontend com testes e aderencia ao pl
 ## Guidelines
 - Leia `.ai/decisions.md` para verificar decisões anteriores que possam afetar esta demanda. Decisao registrada ali prevalece sobre default de arquivo de stack.
 - Leia `.ai/guidelines/core/execution.md`.
+- Leia `.ai/guidelines/core/cli-delegation.md` quando delegar subtarefas para CLIs externas via terminal.
 - Leia `.ai/stack.md` e o(s) arquivo(s) de stack indicado(s) em `.ai/guidelines/stacks/`.
 - Leia `.ai/guidelines/core/frontend.md`.
 - Leia `.ai/guidelines/core/testing.md`.
@@ -27,4 +28,8 @@ Implementar tasks que atravessam backend e frontend com testes e aderencia ao pl
 - `daisyui`: use ao trabalhar com componentes e temas daisyUI.
 - `tailwindcss-development`: use ao aplicar estilos com Tailwind CSS.
 - `executar-task`: use ao executar uma task planejada, seguindo o fluxo de execucao estruturada.
+- `test-driven-development`: use obrigatoriamente para implementar novas funcionalidades via TDD.
+- `systematic-debugging`: use para investigar e corrigir bugs com causa raiz comprovada.
+- `verification-before-completion`: use antes de reportar conclusão da tarefa.
 - Notifique o usuario em tarefas longas (use a ferramenta de mensagem disponivel no ambiente).
+

@@ -35,3 +35,6 @@ Validar qualidade, criterios de aceite, testes, PRs e prontidao de release.
 
 ## Skills
 - `revisar`: use para auto-review do diff antes de abrir PR.
+- `verification-before-completion`: use para auditar comandos e evidências antes de aprovação.
+- `systematic-debugging`: use ao investigar falhas de teste e relatórios de regressão.
+

@@ -57,6 +57,11 @@ cp -r "$SRC_DIR/.ai/guidelines/domain" "$TARGET/.ai/guidelines/domain"
 rm -rf "$TARGET/.ai/templates"
 cp -r "$SRC_DIR/.ai/templates" "$TARGET/.ai/templates"
 
+# Subagents
+rm -rf "$TARGET/.ai/subagents"
+cp -r "$SRC_DIR/.ai/subagents" "$TARGET/.ai/subagents"
+
+
 # Roteamento de modelos pertence ao projeto depois da primeira instalacao.
 if [ ! -f "$TARGET/.ai/model-routing.yaml" ]; then
     cp "$SRC_DIR/.ai/model-routing.yaml" "$TARGET/.ai/model-routing.yaml"

@@ -18,16 +18,231 @@ profiles:
     rank: 3
     description: Arquitetura, investigacao dificil e trabalho de alto risco.
 
-# Preencha com os modelos disponiveis e avaliados no projeto. Exemplo:
-# models:
-#   provider-model-version:
-#     provider: provider
-#     profile: balanced
-#     status: active
-#     capabilities: [backend, tests]
-#     last_evaluated: YYYY-MM-DD
-#     evidence: "resultado de avaliacao local"
-models: {}
+# Catálogo oficial de modelos avaliados no projeto:
+models:
+  anthropic-opus-5:
+    provider: anthropic
+    model: "claude-opus-5"
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A documentação atual da Anthropic identifica `claude-opus-5` para trabalho agentic de programação complexo; no lançamento, a Lovable reportou +22% de sucesso nas suas tarefas agentic de código mais difíceis versus Opus 4.7, sustentando `frontier` no esforço padrão. [S1][S2]"
+
+  openai-gpt-5-6-sol:
+    provider: openai
+    model: "gpt-5.6-sol"
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A OpenAI documenta `gpt-5.6-sol` como o modelo frontier da família; no lançamento, Sol em Max marcou 80 no Artificial Analysis Coding Agent Index e 72,7% no DeepSWE v1.1, justificando `frontier`, com Low rebaixado por reduzir compute de raciocínio. [S5][S6]"
+
+  anthropic-sonnet-5:
+    provider: anthropic
+    model: "claude-sonnet-5"
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A Anthropic lista `claude-sonnet-5` entre os modelos atuais e o lançamento de 30/06/2026 documenta desempenho de agentic coding em classe Opus, além de ganhos em tarefas de engenharia de software, o que sustenta `frontier` no padrão e acima, mas não em Low. [S1][S3]"
+
+  openai-gpt-5-6-terra:
+    provider: openai
+    model: "gpt-5.6-terra"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A OpenAI define `gpt-5.6-terra` como a opção que equilibra inteligência e custo; sua tabela de coding reporta 77,4 no Artificial Analysis Coding Agent Index, 63,4% no SWE-Bench Pro, 69,6% no DeepSWE v1.1 e 87,4% no Terminal-Bench 2.1, sustentando `balanced` por padrão e `frontier` apenas com High/Max. [S5][S7]"
+
+  deepseek-v4-pro:
+    provider: deepseek
+    model: "deepseek-v4-pro"
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A DeepSeek levou `deepseek-v4-pro` a GA em 13/08/2026 e reportou 87,9 no Terminal-Bench 2.1, 61,5 no NL2Repo, 62,7 no DeepSWE v1.1 e 83,3 no CyberGym, além de posicioná-lo como seu modelo SOTA para agentic coding; por isso o padrão é `frontier`. [S9][S10]"
+
+  deepseek-v4-flash:
+    provider: deepseek
+    model: "deepseek-v4-flash"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: preview
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A DeepSeek mantém o ID `deepseek-v4-flash`; a versão 0731 entrou em API como versão formal em public beta e, em avaliações de Code Agent executadas em Max, marcou 82,7 no Terminal-Bench 2.1 e 54,2 no NL2Repo, portanto fica `balanced` e não é promovida a R3 enquanto não houver GA. [S9][S10]"
+
+  deepseek-v4-flash-vision-exp:
+    provider: deepseek
+    model: "deepseek-v4-flash-vision-exp"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: preview
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A DeepSeek lançou `deepseek-v4-flash-vision-exp` em 21/08/2026 explicitamente como experimental, com capacidade textual equivalente à V4 Flash e ganhos multimodais; apesar de reportar 83,9 no Terminal-Bench 2.1 em sua avaliação Max, o status experimental mantém todas as variantes no máximo em `balanced`. [S9][S10]"
+
+  google-gemini-3-7-flash:
+    provider: google
+    model: "gemini-3.7-flash"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A documentação Google de 13/08/2026 marca `gemini-3.7-flash` como Stable, nativamente multimodal, com 1.048.576 tokens de entrada, execução de código e thinking; como não encontrei ali um número público verificável de benchmark de programação específico do 3.7 Flash, a classificação fica conservadoramente em `balanced`. [S11]"
+
+  anthropic-haiku-4-5:
+    provider: anthropic
+    model: "claude-haiku-4-5-20251001"
+    profile: economical
+    profile_by_variant:
+      default: economical
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A Anthropic documenta o ID datado `claude-haiku-4-5-20251001`; no lançamento, afirmou desempenho de coding semelhante ao Sonnet 4 a um terço do custo e mais de 2x a velocidade, enquanto a Augment reportou cerca de 90% do Sonnet 4.5 em sua avaliação agentic de código, sustentando `economical` por padrão e no máximo `balanced`. [S1][S4]"
+
+  openai-gpt-5-6-luna:
+    provider: openai
+    model: "gpt-5.6-luna"
+    profile: economical
+    profile_by_variant:
+      default: economical
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A OpenAI define `gpt-5.6-luna` para workloads de alto volume sensíveis a custo; embora a tabela de coding reporte 74,6 no Artificial Analysis Coding Agent Index, 62,7% no SWE-Bench Pro, 67,2% no DeepSWE v1.1 e 84,7% no Terminal-Bench 2.1, seu posicionamento nano/cost-sensitive recomenda `economical` no padrão e teto `balanced`. [S5][S8]"
+
+  meta-muse-spark-1-2-contributor:
+    provider: meta
+    model: "muse-spark-1.2-contributor"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: preview
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A documentação da Meta confirma `muse-spark-1.2-contributor` na Meta Model API com contexto de 1M; o lançamento de 05/08/2026 descreve 1.2 como coding-focused, treinado para debugging, entendimento de codebase e trabalho de repositório inteiro e mostra Terminal-Bench 2.1/DeepSWE 1.1 apenas em gráficos sem números textuais verificáveis, por isso fica `balanced` e, conservadoramente, `preview` enquanto a Model API não tiver anúncio de GA localizado. [S12]"
+
+  tencent-hy3:
+    provider: tencent
+    model: "hy3"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A lista oficial da Tencent Cloud dá `hy3` como API Parameter e a Tencent posiciona Hy3 para Coding Agent e desenvolvimento, reportando mais de 90% de sucesso no teste interno WorkBuddy; como não localizei um score público padronizado de SWE-Bench/Terminal-Bench para Hy3, mantenho `balanced`. [S13]"
+
+  xiaomi-mimo-v2-5:
+    provider: xiaomi
+    model: "mimo-v2.5"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A API oficial da Xiaomi aceita exatamente `mimo-v2.5`, com percepção omni-modal e contexto de 1M; no experimento oficial do MiMo Code usando o mesmo modelo, a Xiaomi reportou 62% no SWE-Bench Pro e 73% no Terminal Bench 2, desempenho forte mas insuficiente para promover o modelo-base não-Pro a `frontier`. [S14]"
+
+  meituan-longcat-2-0:
+    provider: meituan
+    model: "LongCat-2.0"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: balanced
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A API LongCat usa exatamente `LongCat-2.0`; a avaliação oficial da Meituan reporta 70,8 no Terminal-Bench 2.1, 59,5 no SWE-bench Pro e 77,3 no SWE-bench Multilingual, bons resultados de engenharia mas abaixo dos modelos aqui classificados como `frontier`, portanto o teto permanece `balanced`. [S15]"
+
+  alibaba-qwen-3-7-plus:
+    provider: alibaba
+    model: "qwen3.7-plus"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "O Alibaba Model Studio documenta `qwen3.7-plus` com contexto de 1M, visão e capacidades agent-level para coding/tool use, mas chama Plus de opção cost-effective que equilibra desempenho e custo; não encontrei no material oficial consultado um score de coding específico do 3.7 Plus que justificasse R3, portanto fica `balanced`. [S16]"
+
+  openai-gpt-oss-120b:
+    provider: openai
+    model: "gpt-oss-120b"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: balanced
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    last_evaluated: 2026-08-27
+    evidence: "A página oficial identifica `gpt-oss-120b` como o maior modelo open-weight da OpenAI e a model card mostra que, em reasoning `high`, ele se aproxima do o4-mini em Codeforces e SWE-Bench Verified; como é um modelo de 2025, text-only e oficialmente suporta low/medium/high, trato o '(medium)' do catálogo como esforço e mantenho o modelo em `balanced`, sem presumir que 'Max' seja um nível nativo da OpenAI. [S17]"
 
 risk_domains:
   generic_r3:
@@ -57,3 +272,35 @@ routes:
     reviewer_profile: frontier
     independent_model: true
     cross_provider: project_policy
+
+# Runners de CLI para delegação de comandos via terminal
+# Use /l-nexus:configurar-roteamento para reconfigurar interativamente.
+cli_runners:
+  codex:
+    binary: "codex"
+    command_template: "codex exec --model {model} -p \"{prompt}\""
+    default_model: "gpt-5.6-sol"
+  claude:
+    binary: "claude"
+    command_template: "claude -p \"{prompt}\" --model {model}"
+    default_model: "claude-sonnet-5"
+  opencode:
+    binary: "opencode"
+    command_template: "opencode --model {model} \"{prompt}\""
+    default_model: "deepseek-v4-flash"
+  agy:
+    binary: "agy"
+    command_template: "agy --model {model} \"{prompt}\""
+    default_model: "gemini-3.7-flash"
+  gemini:
+    binary: "gemini"
+    command_template: "gemini run --model {model} \"{prompt}\""
+    default_model: "gemini-3.7-flash"
+  qwen:
+    binary: "qwen"
+    command_template: "qwen --model {model} \"{prompt}\""
+    default_model: "qwen3.7-plus"
+  kimi:
+    binary: "kimi"
+    command_template: "kimi --model {model} \"{prompt}\""
+    default_model: "kimi-k2-chat"
