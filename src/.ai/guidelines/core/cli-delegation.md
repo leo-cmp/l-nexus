@@ -69,7 +69,7 @@ cli_runners:
     default_model: "kimi-k2-chat"
 ```
 
-> **Dica:** Para reconfigurar facilmente as CLIs e modelos do projeto, execute o atalho `/l-nexus:configurar-roteamento`.
+> **Dica:** Para reconfigurar facilmente as CLIs e modelos do projeto, execute o atalho `/lnx-configurar-roteamento`.
 
 ---
 

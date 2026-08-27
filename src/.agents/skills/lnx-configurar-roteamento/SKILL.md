@@ -1,12 +1,12 @@
 ---
-name: configurar-roteamento
+name: lnx-configurar-roteamento
 description: Configura interativamente o roteamento de modelos (.ai/model-routing.yaml) e as diretrizes de delegação de CLIs via terminal (.ai/guidelines/core/cli-delegation.md).
 disable-model-invocation: false
 ---
 
 # Configurar Roteamento e Delegação por Terminal CLI
 
-Esta skill deve ser acionada quando o usuário desejar configurar ou redefinir os modelos de IA, perfis de risco e executores de terminal CLI (`codex`, `claude`, `opencode`, `agy`, `gemini`, `ollama`, etc.), ou via atalho `/l-nexus:configurar-roteamento` / `/l-nexus:configurar-cli`.
+Esta skill deve ser acionada quando o usuário desejar configurar ou redefinir os modelos de IA, perfis de risco e executores de terminal CLI (`codex`, `claude`, `opencode`, `agy`, `gemini`, `qwen`, `kimi`, etc.), ou via atalho `/lnx-configurar-roteamento`.
 
 ## Fluxo Interativo Obrigatório
 

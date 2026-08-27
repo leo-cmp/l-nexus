@@ -71,18 +71,23 @@ projeto/
 
 ---
 
-## Atalhos do Agente
+## Atalhos do Agente (Slash Commands)
+
+Organizados pela hierarquia **`/lnx-<recurso>-<ação>`**:
 
 | Atalho | Ação |
 |--------|------|
-| `/l-nexus:iniciar` | Bootstrap do projeto (project.md, stack.md, regras) |
-| `/l-nexus:configurar-roteamento` | Configurar interativamente model-routing.yaml e executores de terminal CLI |
-| `/l-nexus:criar-plano` | Criar plano de fase |
-| `/l-nexus:criar-task` | Criar task detalhada |
-| `/l-nexus:atualizar` | Atualizar regras de negócio |
-| `/l-nexus:atualizar-l-nexus` | Atualizar l-nexus para versão mais recente |
-| `/l-nexus:brainstorm-lite` | Brainstorming rápido (3 perguntas máx) |
-| `/l-nexus:gerar-prompt` | Gerar prompt limpo para nova sessão |
+| `/lnx-projeto-iniciar` | Bootstrap de projeto novo (`project.md`, `stack.md`, regras) |
+| `/lnx-projeto-revisar` | Scan e mapeamento automático de projeto existente |
+| `/lnx-projeto-atualizar` | Sincronizar regras e stack do projeto |
+| `/lnx-plano-criar` | Criar plano de fase local (`plan.md`) |
+| `/lnx-task-criar` | Criar tarefa detalhada (`task_X_Y.md`) |
+| `/lnx-task-executar` | Executar próxima tarefa do plano |
+| `/lnx-task-revisar` | Revisão de diff da tarefa (auto-review) |
+| `/lnx-configurar-roteamento` | Configurar interativamente `model-routing.yaml` e CLIs |
+| `/lnx-nexus-atualizar` | Atualizar pacote l-nexus via `npx @leo-cmp/l-nexus update` |
+| `/lnx-prompt-gerar` | Gerar prompt limpo para nova sessão |
+| `/lnx-brainstorm-lite` | Brainstorming rápido (3 perguntas máx) |
 
 
 ---

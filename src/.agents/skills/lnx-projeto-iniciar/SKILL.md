@@ -1,12 +1,12 @@
 ---
-name: iniciar-projeto
+name: lnx-projeto-iniciar
 description: Inicializa um projeto configurando as diretrizes locais em .ai/, incluindo o project.md, stack.md e estruturando as regras de negócio.
 disable-model-invocation: false
 ---
 
 # Iniciar Projeto
 
-Esta skill deve ser ativada quando o usuário solicitar a inicialização ou configuração de um novo projeto, ou via comando `/l-nexus:iniciar`.
+Esta skill deve ser ativada quando o usuário solicitar a inicialização ou configuração de um novo projeto, ou via comando `/lnx-projeto-iniciar`.
 
 ## Fluxo
 

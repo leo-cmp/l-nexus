@@ -1,5 +1,5 @@
 ---
-name: criar-task
+name: lnx-task-criar
 description: Cria um arquivo de tarefa técnica estruturado em .planning/PLAN_VN/tasks/task_X_Y.md com critérios de aceite e especificações detalhadas.
 disable-model-invocation: false
 ---
@@ -10,7 +10,7 @@ disable-model-invocation: false
 > **OBRIGATORIEDADE DE BRAINSTORMING E DIÁLOGO**:
 > Você **NUNCA** deve criar ou detalhar arquivos de tarefas (`task_X_Y.md`) sem alinhar com o usuário. Antes de preencher as especificações técnicas, utilize a skill de `brainstorming` ou faça perguntas objetivas uma a uma para definir a UI, os fluxos, as origens de dados e os cenários de teste específicos que o usuário espera. Não assuma nem infira regras de negócio por conta própria.
 
-Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova tarefa no plano, ou via comando `/l-nexus:criar-task`.
+Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova tarefa no plano, ou via comando `/lnx-task-criar`.
 
 ## Fluxo
 

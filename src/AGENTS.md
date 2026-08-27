@@ -19,10 +19,10 @@ Este arquivo e o ponto de entrada comum do projeto. Ele deve ficar curto.
 
 ## Carregamento de Skills (Lazy Loading)
 
-**Carregue skills apenas quando explicitamente acionadas** (atalho `/l-nexus:*`, cargo ativo ou guideline de stack).
+**Carregue skills apenas quando explicitamente acionadas** (atalho `/lnx-*`, cargo ativo ou guideline de stack).
 
 As demais skills so devem ser lidas quando:
-- O usuario acionar um atalho `/l-nexus:*` explicitamente, OU
+- O usuario acionar um atalho `/lnx-*` explicitamente, OU
 - O cargo ativo ou a guideline de stack indicar explicitamente a skill, OU
 - A demanda atual exigir o uso de uma skill especifica.
 
@@ -33,18 +33,26 @@ As demais skills so devem ser lidas quando:
 
 Carregar skills desnecessariamente consome contexto e degrada a sessao. Cada role e guideline de stack ja lista as skills relevantes para aquele contexto.
 
-## Atalhos de Prompt (/l-nexus)
+## Atalhos de Prompt (/lnx-*)
 
 Se o humano iniciar a mensagem com um dos comandos abaixo, a IA deve carregar a skill correspondente de `.agents/skills/` **naquele momento** e seguir o seu fluxo. Toda criação de artefato deve passar por consulta ativa ao usuário:
-- `/l-nexus:iniciar` ou `/l-nexus:iniciar-projeto`: Ativa a skill `iniciar-projeto` para configurar `.ai/project.md`, `.ai/stack.md` e regras iniciais de negócio.
-- `/l-nexus:criar-plano` ou `/l-nexus:criar-plano-fase`: Ativa a skill `criar-plano` para desenhar o plano de uma nova fase local (`.planning/PLAN_VN/plan.md`).
-- `/l-nexus:criar-task` ou `/l-nexus:criar-tarefa`: Ativa a skill `criar-task` para gerar uma nova tarefa em `.planning/PLAN_VN/tasks/task_X_Y.md` usando o template.
-- `/l-nexus:atualizar` ou `/l-nexus:atualizar-projeto`: Ativa a skill `atualizar-projeto` para sincronizar novas regras de negócio ou alterações de escopo em `.ai/project.md`.
-- `/l-nexus:configurar-roteamento` ou `/l-nexus:configurar-cli`: Ativa a skill `configurar-roteamento` para configurar interativamente `.ai/model-routing.yaml` e as diretrizes de delegação de CLIs via terminal (`.ai/guidelines/core/cli-delegation.md`).
-- `/l-nexus:brainstorm-lite`: Ativa a skill `brainstorming-lite` para tarefas L2.
-- `/l-nexus:atualizar-l-nexus`: Ativa a skill `atualizar-l-nexus` para atualizar o l-nexus para a versao mais recente.
-- `/l-nexus:gerar-prompt`: Ativa a skill `gerar-prompt` para gerar prompt de continuacao para nova sessao.
-- `/l-nexus:review` ou `/l-nexus:review-projeto`: Ativa a skill `review-projeto` para analisar o codigo existente e gerar/atualizar automaticamente `.ai/project.md`, `.ai/stack.md` e mapear regras de negocio. Ideal para quando o l-nexus e instalado em um projeto ja em andamento.
+
+### 📁 Projeto (`/lnx-projeto-*`)
+- `/lnx-projeto-iniciar`: Ativa a skill `lnx-projeto-iniciar` para configurar `.ai/project.md`, `.ai/stack.md` e regras iniciais em projetos novos.
+- `/lnx-projeto-revisar`: Ativa a skill `lnx-projeto-revisar` para escanear e mapear automaticamente projetos existentes.
+- `/lnx-projeto-atualizar`: Ativa a skill `lnx-projeto-atualizar` para sincronizar novas regras de negócio ou alterações de escopo em `.ai/project.md`.
+
+### 📋 Planejamento & Tasks (`/lnx-plano-*` e `/lnx-task-*`)
+- `/lnx-plano-criar`: Ativa a skill `lnx-plano-criar` para desenhar o plano de uma nova fase local (`.planning/PLAN_VN/plan.md`).
+- `/lnx-task-criar`: Ativa a skill `lnx-task-criar` para gerar uma nova tarefa em `.planning/PLAN_VN/tasks/task_X_Y.md` usando o template.
+- `/lnx-task-executar`: Ativa a skill `lnx-task-executar` para executar a próxima tarefa do plano.
+- `/lnx-task-revisar`: Ativa a skill `lnx-task-revisar` para fazer code review leve do próprio diff.
+
+### ⚙️ Configuração & Ferramentas (`/lnx-configurar-*`, `/lnx-nexus-*`, etc.)
+- `/lnx-configurar-roteamento`: Ativa a skill `lnx-configurar-roteamento` para configurar interativamente `.ai/model-routing.yaml` e executores de CLI via terminal.
+- `/lnx-nexus-atualizar`: Ativa a skill `lnx-nexus-atualizar` para atualizar o pacote l-nexus via `npx @leo-cmp/l-nexus update`.
+- `/lnx-prompt-gerar`: Ativa a skill `lnx-prompt-gerar` para gerar prompt de continuação para nova sessão.
+- `/lnx-brainstorm-lite`: Ativa a skill `lnx-brainstorm-lite` para brainstorming rápido (até 3 perguntas) em tarefas L2.
 
 > [!IMPORTANT]
 > **DIRETRIZ DE DIÁLOGO E ALINHAMENTO**: Qualquer agente que executar atalhos de planejamento/codificação está **proibido de fazer suposições ou criar arquivos em silêncio**.

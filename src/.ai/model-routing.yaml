@@ -274,7 +274,7 @@ routes:
     cross_provider: project_policy
 
 # Runners de CLI para delegação de comandos via terminal
-# Use /l-nexus:configurar-roteamento para reconfigurar interativamente.
+# Use /lnx-configurar-roteamento para reconfigurar interativamente.
 cli_runners:
   codex:
     binary: "codex"

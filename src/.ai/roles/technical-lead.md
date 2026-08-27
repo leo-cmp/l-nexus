@@ -31,10 +31,10 @@ Planejar a execucao tecnica em fases, tasks, issues e criterios de aceite.
 
 ## Skills
 - `brainstorming`: use antes de criar planos, fases ou tasks para alinhar com o usuario.
-- `criar-plano`: use ao desenhar um novo plano de fase.
-- `criar-task`: use ao gerar tasks detalhadas.
-- `executar-task`: use ao coordenar a execucao de tasks planejadas.
-- `configurar-roteamento`: use para configurar ou ajustar o roteamento de modelos e runners de CLI.
+- `lnx-plano-criar`: use ao desenhar um novo plano de fase.
+- `lnx-task-criar`: use ao gerar tasks detalhadas.
+- `lnx-task-executar`: use ao coordenar a execucao de tasks planejadas.
+- `lnx-configurar-roteamento`: use para configurar ou ajustar o roteamento de modelos e runners de CLI.
 - `verification-before-completion`: use obrigatoriamente antes de fechar fases e tasks.
 - Notifique o usuario em execucoes longas (use a ferramenta de mensagem disponivel no ambiente).
 

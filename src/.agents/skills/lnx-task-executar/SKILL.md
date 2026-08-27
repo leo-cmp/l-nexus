@@ -1,5 +1,5 @@
 ---
-name: executar-task
+name: lnx-task-executar
 description: Localiza, valida e executa a proxima task pendente em .planning/, registrando evidencias de progresso.
 disable-model-invocation: false
 ---
@@ -40,7 +40,7 @@ disable-model-invocation: false
    - > [!IMPORTANT]
      > **BRAINSTORMING E DESIGN PRÉVIO MANDATÓRIO**:
      > Antes de modificar ou criar qualquer arquivo de código operacional do projeto, invoque a skill de `brainstorming` para apresentar sua proposta de design técnico e arquitetura para a tarefa. Faça perguntas uma a uma sobre pontos ambíguos e obtenha aprovação expressa do design pelo usuário. **Não faça suposições nem decida caminhos de implementação de forma silenciosa.**
-   - > **Brainstorming para L2:** Para tarefas de complexidade padrao (2-5 arquivos, sem nova regra de negocio), use `brainstorming-lite` em vez de `brainstorming` completo.
+   - > **Brainstorming para L2:** Para tarefas de complexidade padrao (2-5 arquivos, sem nova regra de negocio), use `lnx-brainstorm-lite` em vez de `brainstorming` completo.
    - Atualize `status: in_progress` e `updated_at` com data/hora atual.
    - Antes de editar codigo, preencha `model_execution.executor` com agente,
      provedor, modelo exato e `started_at`. Use `unknown` apenas quando o runtime
@@ -62,7 +62,7 @@ disable-model-invocation: false
     - Erros encontrados vao para `Erros e Correcoes` com: erro + causa + correcao + prova.
     - Consulte `.ai/guidelines/core/execution.md` secao "Registro de Evidencias".
 
-5.5. **Auto-review:** Execute a skill `revisar` (3 perguntas sobre o proprio diff).
+5.5. **Auto-review:** Execute a skill `lnx-task-revisar` (3 perguntas sobre o proprio diff).
     - Se 3/3 passarem: prossiga.
     - Se alguma falhar: corrija e reexecute.
     - Auto-review nao satisfaz revisao independente exigida por R3 ou pela

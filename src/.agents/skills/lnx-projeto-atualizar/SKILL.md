@@ -1,12 +1,12 @@
 ---
-name: atualizar-projeto
+name: lnx-projeto-atualizar
 description: Atualiza a documentação técnica central do projeto em .ai/project.md com novas stacks, configurações de ambiente e regras de negócio.
 disable-model-invocation: false
 ---
 
 # Atualizar Projeto
 
-Esta skill deve ser ativada quando houver mudanças nas regras de negócio globais, nova stack ou reconfiguração do ambiente, ou via comando `/l-nexus:atualizar`.
+Esta skill deve ser ativada quando houver mudanças nas regras de negócio globais, nova stack ou reconfiguração do ambiente, ou via comando `/lnx-projeto-atualizar`.
 
 ## Fluxo
 

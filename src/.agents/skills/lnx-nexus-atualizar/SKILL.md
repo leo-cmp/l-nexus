@@ -1,6 +1,6 @@
 ---
-name: atualizar-l-nexus
-description: Atualiza o l-nexus para a versao mais recente via npx e reexecuta install.sh.
+name: lnx-nexus-atualizar
+description: Atualiza o pacote l-nexus para a versao mais recente via npx update.
 ---
 
 # Atualizar l-nexus

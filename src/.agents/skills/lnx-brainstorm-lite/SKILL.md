@@ -1,5 +1,5 @@
 ---
-name: brainstorming-lite
+name: lnx-brainstorm-lite
 description: >
   Versao reduzida do brainstorming para tarefas de complexidade padrao (L2).
   3 perguntas maximas, sem visual companion, sem spec document.

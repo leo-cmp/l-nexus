@@ -27,7 +27,7 @@ Implementar tasks que atravessam backend e frontend com testes e aderencia ao pl
 ## Skills
 - `daisyui`: use ao trabalhar com componentes e temas daisyUI.
 - `tailwindcss-development`: use ao aplicar estilos com Tailwind CSS.
-- `executar-task`: use ao executar uma task planejada, seguindo o fluxo de execucao estruturada.
+- `lnx-task-executar`: use ao executar uma task planejada, seguindo o fluxo de execucao estruturada.
 - `test-driven-development`: use obrigatoriamente para implementar novas funcionalidades via TDD.
 - `systematic-debugging`: use para investigar e corrigir bugs com causa raiz comprovada.
 - `verification-before-completion`: use antes de reportar conclusão da tarefa.

@@ -34,7 +34,7 @@ Validar qualidade, criterios de aceite, testes, PRs e prontidao de release.
 - Leia `.ai/guidelines/domain/business-rules/index.md`.
 
 ## Skills
-- `revisar`: use para auto-review do diff antes de abrir PR.
+- `lnx-task-revisar`: use para auto-review do diff antes de abrir PR.
 - `verification-before-completion`: use para auditar comandos e evidências antes de aprovação.
 - `systematic-debugging`: use ao investigar falhas de teste e relatórios de regressão.
 

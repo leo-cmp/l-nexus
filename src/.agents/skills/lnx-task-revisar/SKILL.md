@@ -1,5 +1,5 @@
 ---
-name: revisar
+name: lnx-task-revisar
 description: >
   Code review leve do proprio diff. Use antes de abrir PR ou marcar task como concluida.
   Foco: bugs obvios, seguranca, debug artifacts, desvios do plano.

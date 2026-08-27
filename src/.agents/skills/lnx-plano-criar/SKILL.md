@@ -1,5 +1,5 @@
 ---
-name: criar-plano
+name: lnx-plano-criar
 description: Cria uma nova fase local de desenvolvimento em .planning/PLAN_VN/plan.md, estruturando marcos e o roadmap inicial da fase.
 disable-model-invocation: false
 ---
@@ -10,7 +10,7 @@ disable-model-invocation: false
 > **OBRIGATORIEDADE DE BRAINSTORMING E DIÁLOGO**:
 > Você **NUNCA** deve criar arquivos de plano (`plan.md`) diretamente com base em suposições. Antes de escrever o arquivo, você deve obrigatoriamente invocar a skill de `brainstorming` para interagir com o usuário, propor caminhos, fazer perguntas uma a uma e validar o escopo da fase. Somente após a aprovação expressa do design pelo usuário você poderá gerar os arquivos físicos.
 
-Esta skill deve ser ativada quando o usuário solicitar o planejamento de uma nova fase, ou via comando `/l-nexus:criar-plano`.
+Esta skill deve ser ativada quando o usuário solicitar o planejamento de uma nova fase, ou via comando `/lnx-plano-criar`.
 
 ## Fluxo
 

@@ -1,5 +1,5 @@
 ---
-name: gerar-prompt
+name: lnx-prompt-gerar
 description: Gera prompt limpo para iniciar ou continuar trabalho em nova sessao. Le estado atual e produz saida concisa: task, branch, status, proximo passo. Zero fluff, zero redundancia com AGENTS.md.
 ---
 

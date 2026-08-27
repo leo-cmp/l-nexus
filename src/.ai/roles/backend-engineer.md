@@ -24,5 +24,5 @@ Implementar backend com seguranca, testes e regras de negocio corretas.
 - Leia `.ai/guidelines/core/git-pr.md` ao fazer commits ou abrir PRs.
 
 ## Skills
-- `executar-task`: use ao executar uma task planejada, seguindo o fluxo de execucao estruturada.
+- `lnx-task-executar`: use ao executar uma task planejada, seguindo o fluxo de execucao estruturada.
 - Notifique o usuario em tarefas longas (use a ferramenta de mensagem disponivel no ambiente).

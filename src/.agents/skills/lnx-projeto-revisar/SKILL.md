@@ -1,13 +1,13 @@
 ---
-name: review-projeto
-description: Analisa um projeto existente para criar/atualizar .ai/project.md, .ai/stack.md e mapear regras de negócio automaticamente. Usado quando l-nexus é instalado em um projeto já em andamento, ou via comando /l-nexus:review.
+name: lnx-projeto-revisar
+description: Analisa um projeto existente para criar/atualizar .ai/project.md, .ai/stack.md e mapear regras de negócio automaticamente. Usado quando l-nexus é instalado em um projeto já em andamento, ou via comando /lnx-projeto-revisar.
 ---
 
-# Review Projeto
+# Revisar Projeto (Scan & Análise Automática)
 
-Esta skill deve ser ativada quando o l-nexus for instalado em um projeto **já existente** (com código, dependências e estrutura), ou quando o usuário solicitar revisão/análise do projeto para gerar/atualizar `project.md`, ou via comando `/l-nexus:review`.
+Esta skill deve ser ativada quando o l-nexus for instalado em um projeto **já existente** (com código, dependências e estrutura), ou quando o usuário solicitar revisão/análise do projeto para gerar/atualizar `project.md`, ou via comando `/lnx-projeto-revisar`.
 
-> **Diferente de `iniciar-projeto`**: o `review-projeto` faz scan automático do código existente para preencher `project.md` e `stack.md`. O `iniciar-projeto` é para projetos novos onde o usuário define tudo manualmente.
+> **Diferente de `lnx-projeto-iniciar`**: o `lnx-projeto-revisar` faz scan automático do código existente para preencher `project.md` e `stack.md`. O `lnx-projeto-iniciar` é para projetos novos onde o usuário define tudo manualmente.
 
 ## Fluxo
 
@@ -174,7 +174,7 @@ Consulte as diretrizes específicas em `.ai/guidelines/stacks/`:
 ### Fase 7 — Finalizar
 
 1. Confirme que os arquivos foram escritos corretamente.
-2. Sugira: "Use `/l-nexus:criar-plano` para iniciar uma nova fase de desenvolvimento."
+2. Sugira: "Use `/lnx-plano-criar` para iniciar uma nova fase de desenvolvimento."
 3. Atualize `session-memory.md` com o resumo do review.
 
 ## Circuit Breakers
