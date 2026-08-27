@@ -9,7 +9,7 @@ description: Atualiza o l-nexus para a versao mais recente via npx e reexecuta i
 
 1. **Atualizar:**
    ```bash
-   npx @leo-cmp/l-nexus install-force
+   npx @leo-cmp/l-nexus update
    ```
 
 2. **Reportar:**
@@ -18,5 +18,5 @@ description: Atualiza o l-nexus para a versao mais recente via npx e reexecuta i
 
 ## Seguranca
 
-- O install-force sobrescreve `.agents/` e `.mcp.json`.
+- O comando `update` limpa e recria `.agents/` e `.mcp.json`.
 - Se houver alteracoes locais nesses diretorios, PARE e pergunte antes de prosseguir.

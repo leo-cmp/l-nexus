@@ -37,8 +37,8 @@ EOF
 grep -q "custom_marker: preserve-me" "$TARGET/.ai/model-routing.yaml" ||
     fail "install sobrescreveu a politica do projeto"
 
-"$CLI" install-force "$TARGET" >/dev/null
+"$CLI" update "$TARGET" >/dev/null
 grep -q "custom_marker: preserve-me" "$TARGET/.ai/model-routing.yaml" ||
-    fail "install-force sobrescreveu a politica do projeto"
+    fail "update sobrescreveu a politica do projeto"
 
 echo "scripts/test-model-routing-install.sh: ok"

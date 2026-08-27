@@ -11,8 +11,8 @@ const commands = new Map([
     executable: path.join(scriptDirectory, 'install.sh'),
     prefix: [],
   }],
-  ['install-force', {
-    executable: path.join(scriptDirectory, 'install-force.sh'),
+  ['update', {
+    executable: path.join(scriptDirectory, 'update.sh'),
     prefix: [],
   }],
   ['validate-task', {
@@ -30,7 +30,7 @@ function usage() {
 
 Commands:
   install [target]
-  install-force [target]
+  update [target]
   validate-task <task-path> [--routing <path>] [--final-commit <sha>]
   migrate-task <task-path> [--write]`;
 }

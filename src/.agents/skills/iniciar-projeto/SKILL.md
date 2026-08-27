@@ -25,4 +25,4 @@ Esta skill deve ser ativada quando o usuário solicitar a inicialização ou con
    - Crie um arquivo inicial em `.ai/guidelines/domain/business-rules/index.md` listando as regras comerciais conhecidas ou pendentes de alinhamento com o usuário.
 
 4. **Verificar Instalação do l-nexus:**
-   - Execute `npx @leo-cmp/l-nexus install` (ou `npx @leo-cmp/l-nexus install-force` para reinstalação) para garantir que todos os arquivos de agentes e diretrizes estejam presentes na raiz do projeto.
+   - Execute `npx @leo-cmp/l-nexus install` (ou `npx @leo-cmp/l-nexus update` para atualização limpa) para garantir que todos os arquivos de agentes e diretrizes estejam presentes na raiz do projeto.

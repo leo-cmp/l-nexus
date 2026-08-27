@@ -16,9 +16,9 @@ SCRIPT_PATH="$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 ROOT_DIR="$(dirname "$SCRIPT_DIR")"
 TARGET="${1:-.}"
-# Se o argumento for "install" ou "install-force", é invocação via npx sem target
+# Se o argumento for "install" ou "update", é invocação via npx sem target
 case "$TARGET" in
-    install|install-force|--help|-h)
+    install|update|--help|-h)
         TARGET="."
         ;;
 esac

@@ -27,9 +27,9 @@ TARGET="$TMP_DIR/target"
 grep -q "l-nexus instalado com sucesso" "$TMP_DIR/install.log" ||
   fail "install did not report success"
 
-"$CLI" install-force "$TARGET" > "$TMP_DIR/install-force.log"
-grep -q "l-nexus instalado com sucesso" "$TMP_DIR/install-force.log" ||
-  fail "install-force was not dispatched"
+"$CLI" update "$TARGET" > "$TMP_DIR/update.log"
+grep -q "l-nexus instalado com sucesso" "$TMP_DIR/update.log" ||
+  fail "update was not dispatched"
 
 "$CLI" --help > "$TMP_DIR/help.log"
 grep -q "validate-task" "$TMP_DIR/help.log" || fail "help omits validate-task"

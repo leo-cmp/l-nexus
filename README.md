@@ -31,18 +31,14 @@ npx @leo-cmp/l-nexus install
 npx @leo-cmp/l-nexus install
 ```
 
-Para forçar reinstalação (sobrescreve `.agents/` e `.mcp.json`):
-
-```bash
-npx @leo-cmp/l-nexus install-force
-```
-
 ---
 
 ## Atualizar
 
+Para atualizar o l-nexus para a versão mais recente em um projeto existente (recria `.agents/` e `.mcp.json` sem alterar seus dados em `.ai/`):
+
 ```bash
-npx @leo-cmp/l-nexus install-force
+npx @leo-cmp/l-nexus update
 ```
 
 ---
