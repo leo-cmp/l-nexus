@@ -50,8 +50,12 @@ rm -rf "$TARGET/.ai/guidelines/core"
 cp -r "$SRC_DIR/.ai/guidelines/core" "$TARGET/.ai/guidelines/core"
 rm -rf "$TARGET/.ai/guidelines/stacks"
 cp -r "$SRC_DIR/.ai/guidelines/stacks" "$TARGET/.ai/guidelines/stacks"
-rm -rf "$TARGET/.ai/guidelines/domain"
-cp -r "$SRC_DIR/.ai/guidelines/domain" "$TARGET/.ai/guidelines/domain"
+
+# Domain (regras de negocio pertencem exclusivamente ao projeto)
+mkdir -p "$TARGET/.ai/guidelines/domain/business-rules"
+if [ ! -f "$TARGET/.ai/guidelines/domain/business-rules/index.md" ]; then
+    cp -r "$SRC_DIR/.ai/guidelines/domain/." "$TARGET/.ai/guidelines/domain/"
+fi
 
 # Templates
 rm -rf "$TARGET/.ai/templates"
