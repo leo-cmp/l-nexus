@@ -1,7 +1,7 @@
 schema_version: 1
 
-# Este arquivo pertence ao projeto depois da instalacao. Atualizacoes do
-# l-nexus nao devem sobrescrever escolhas, avaliacoes ou dominios locais.
+# 🔒 [PROJETO] Roteamento de Modelos & Executores de CLI
+# Este arquivo pertence exclusivamente ao projeto local e NUNCA é sobrescrito pelo `npx update`.
 project_policy:
   r2_review: optional
   r3_cross_provider: true

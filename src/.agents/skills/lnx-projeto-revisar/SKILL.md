@@ -112,9 +112,10 @@ Após aprovação do usuário, escreva:
 
 **`.ai/project.md`:**
 ```markdown
-# <Nome do Projeto>
+# 🔒 [PROJETO] <Nome do Projeto>
 
-> Última revisão: YYYY-MM-DD (via l-nexus review-projeto)
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.  
+> Última revisão: YYYY-MM-DD (via l-nexus lnx-projeto-revisar)
 
 ## Ambiente e Estrutura
 - **Localização:** Os arquivos rodam diretamente na raiz.
@@ -137,9 +138,10 @@ Após aprovação do usuário, escreva:
 
 **`.ai/stack.md`:**
 ```markdown
-# Stacks do Projeto
+# 🔒 [PROJETO] Stacks do Projeto
 
-> Gerado automaticamente em YYYY-MM-DD via l-nexus review-projeto.
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.  
+> Gerado automaticamente em YYYY-MM-DD via l-nexus lnx-projeto-revisar.
 
 Consulte as diretrizes específicas em `.ai/guidelines/stacks/`:
 
@@ -151,9 +153,10 @@ Consulte as diretrizes específicas em `.ai/guidelines/stacks/`:
 
 **`.ai/guidelines/domain/business-rules/index.md`:**
 ```markdown
-# Regras de Negócio
+# 🔒 [PROJETO] Regras de Negócio
 
-> Mapeado automaticamente em YYYY-MM-DD via l-nexus review-projeto.
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.  
+> Mapeado automaticamente em YYYY-MM-DD via l-nexus lnx-projeto-revisar.
 
 ## Entidades de Domínio
 - <lista das models/entidades detectadas>

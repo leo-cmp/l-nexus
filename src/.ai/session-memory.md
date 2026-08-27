@@ -1,5 +1,6 @@
-# Memória de Sessão
+# 🔒 [PROJETO] Memória da Sessão
 
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.  
 > Última sessão: (nunca) | Agente: — | Modelo: —
 
 ## Estado Atual

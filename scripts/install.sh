@@ -79,7 +79,9 @@ cp "$SRC_DIR/.mcp.json" "$TARGET/.mcp.json"
 # project.md
 if [ ! -f "$TARGET/.ai/project.md" ]; then
     cat > "$TARGET/.ai/project.md" << 'EOF'
-# Novo Projeto
+# 🔒 [PROJETO] Novo Projeto
+
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.
 
 ## Ambiente e Estrutura
 - **Localização:** Os arquivos rodam diretamente na raiz.
@@ -94,8 +96,9 @@ fi
 # stack.md
 if [ ! -f "$TARGET/.ai/stack.md" ]; then
     cat > "$TARGET/.ai/stack.md" << 'EOF'
-# Stacks do Projeto
+# 🔒 [PROJETO] Stacks do Projeto
 
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.
 > Preencha abaixo as stacks do projeto. Remova as que não se aplicam.
 
 Consulte as diretrizes específicas em `.ai/guidelines/stacks/`:
@@ -112,7 +115,9 @@ if [ ! -f "$TARGET/.ai/session-memory.md" ]; then
 fi
 
 # decisions.md
-cp "$SRC_DIR/.ai/decisions.md" "$TARGET/.ai/decisions.md"
+if [ ! -f "$TARGET/.ai/decisions.md" ]; then
+    cp "$SRC_DIR/.ai/decisions.md" "$TARGET/.ai/decisions.md"
+fi
 
 # .gitignore
 if [ -f "$TARGET/.gitignore" ]; then
@@ -123,6 +128,21 @@ fi
 
 echo "=== l-nexus instalado com sucesso ==="
 echo "Versão: $(cat "$ROOT_DIR/VERSION")"
+echo ""
+echo "🔒 Configurações Locais Protegidas (preservadas pelo npx update):"
+echo "  ✓ .ai/project.md"
+echo "  ✓ .ai/stack.md"
+echo "  ✓ .ai/model-routing.yaml"
+echo "  ✓ .ai/session-memory.md"
+echo "  ✓ .ai/decisions.md"
+echo "  ✓ .ai/guidelines/domain/business-rules/"
+echo ""
+echo "⚡ Componentes do Framework Atualizados:"
+echo "  ✓ .ai/roles/"
+echo "  ✓ .ai/guidelines/core/ & stacks/"
+echo "  ✓ .ai/templates/ & subagents/"
+echo "  ✓ .agents/skills/"
+echo "  ✓ .mcp.json"
 echo ""
 echo "Proximo passo:"
 echo "  Se o projeto ja possui codigo existente, execute /lnx-projeto-revisar para"

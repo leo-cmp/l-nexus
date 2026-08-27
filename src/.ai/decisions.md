@@ -1,6 +1,7 @@
-# Índice de Decisões
+# 🔒 [PROJETO] Registro de Decisões
 
-> Registro cronológico. Nunca remover entradas — riscar se revogada.
+> 🔒 **ARQUIVO LOCAL PROTEGIDO**: Este arquivo pertence ao projeto e NUNCA é sobrescrito pelo `npx update`.  
+> Registro cronológico. Nunca remover entradas — riscar se revogada.  
 > Formato: data, contexto, decisão, rationale, alternativas, impacto.
 
 ---

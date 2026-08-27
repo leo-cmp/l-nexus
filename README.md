@@ -45,28 +45,31 @@ npx @leo-cmp/l-nexus update
 
 ## Estrutura instalada no projeto
 
+> 🔒 **Arquivos Locais do Projeto**: Criados uma única vez e **nunca** sobrescritos pelo `npx update`.  
+> ⚡ **Componentes do Framework**: Atualizados automaticamente pelo `npx update`.
+
 ```
 projeto/
-├── AGENTS.md              ← ponto de entrada do agente (symlink ou cópia)
-├── CLAUDE.md              ← idêntico ao AGENTS.md
+├── ⚡ AGENTS.md                  ← ponto de entrada do agente (instruções e atalhos)
+├── ⚡ CLAUDE.md                  ← idêntico ao AGENTS.md
 ├── .ai/
-│   ├── roles/             ← cargos especializados
-│   ├── subagents/         ← templates e protocolo de subagentes isolados
-│   ├── guidelines/
-│   │   ├── core/          ← execution, planning, cli-delegation, git-pr, testing, etc.
-│   │   ├── stacks/        ← práticas por linguagem e framework
-│   │   └── domain/        ← regras de negócio do projeto
-│   ├── templates/         ← plan, task, task-short, issue-local
-│   ├── project.md         ← config do projeto (preenchido por você)
-│   ├── stack.md           ← stacks ativas (preenchido por você)
-│   ├── model-routing.yaml ← modelos, perfis, runners CLI e política de revisão
-│   ├── session-memory.md  ← handoff entre sessões
-│   └── decisions.md       ← índice de decisões do projeto
-├── .agents/
-│   └── skills/            ← fluxos, gating (TDD, Debugging, Verification) e práticas
-├── .claude/
+│   ├── 🔒 project.md             ← contexto e escopo do projeto (preservado)
+│   ├── 🔒 stack.md               ← stacks ativas do projeto (preservado)
+│   ├── 🔒 model-routing.yaml     ← catálogo de modelos e runners de CLI locais (preservado)
+│   ├── 🔒 session-memory.md      ← memória e handoff entre sessões (preservado)
+│   ├── 🔒 decisions.md           ← registro de decisões arquiteturais do projeto (preservado)
+│   ├── 🔒 guidelines/domain/     ← regras de negócio locais (preservado)
+│   ├── ⚡ roles/                 ← personas especializadas de IA (atualizado)
+│   ├── ⚡ subagents/             ← templates e protocolo de subagentes (atualizado)
+│   ├── ⚡ templates/             ← templates de plan, task e issues (atualizado)
+│   └── ⚡ guidelines/
+│       ├── core/                 ← execution, planning, cli-delegation, testing, etc. (atualizado)
+│       └── stacks/               ← diretrizes por stack: Laravel, Tailwind, DaisyUI, etc. (atualizado)
+├── ⚡ .agents/
+│   └── skills/                   ← skills de fluxo (lnx-*), gating (TDD, Debugging) e stacks
+├── ⚡ .claude/
 │   └── skills -> ../.agents/skills
-└── .mcp.json              ← servidores MCP
+└── ⚡ .mcp.json                  ← servidores MCP locais
 ```
 
 ---
