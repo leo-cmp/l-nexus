@@ -14,7 +14,8 @@ Há dois modos de perda que precisam de regras distintas:
   desses caminhos;
 - `.ai/decisions.md` pode continuar existindo, mas perder entradas por
   sobrescrita. Seu próprio contrato diz que entradas nunca são removidas, apenas
-  riscadas quando revogadas.
+  riscadas quando revogadas. Remoção de linhas não serve como aproximação para
+  essa regra, pois riscar ou editar uma decisão legítima também altera linhas.
 
 Uma guarda que verifique apenas arquivos deletados não cobre o segundo caso. Uma
 lista que alimente apenas a mensagem do instalador e o hook também não comprova
@@ -51,7 +52,8 @@ caminhos protegidos e suas políticas. Sua estrutura interna associará cada
 caminho a uma política:
 
 - `no-delete`: impede deletar o arquivo ou qualquer conteúdo sob o diretório;
-- `append-only`: inclui `no-delete` e impede qualquer remoção de linha.
+- `append-only`: inclui `no-delete` e impede que diminua a quantidade de
+  entradas identificadas por cabeçalhos que começam com `## `.
 
 Os caminhos iniciais serão:
 
@@ -88,12 +90,15 @@ Em execução normal, a guarda examinará somente o conteúdo staged:
    para fora de uma área protegida apareça como remoção da origem;
 2. comparará caminhos literalmente, sem interpolá-los como expressões
    regulares;
-3. para `.ai/decisions.md`, lerá o `numstat` staged e bloqueará qualquer número
-   positivo de linhas removidas, mesmo quando houver mais linhas adicionadas;
+3. para `.ai/decisions.md`, comparará a quantidade de cabeçalhos `^## ` no blob
+   de `HEAD` com a quantidade no blob staged e bloqueará quando a segunda for
+   menor; se o arquivo ainda não existir em `HEAD`, a contagem anterior será
+   zero;
 4. reunirá todas as violações antes de encerrar com status diferente de zero.
 
-A exclusão total de `decisions.md` também será bloqueada. Mudanças apenas
-aditivas nesse arquivo e mudanças fora dos caminhos protegidos serão permitidas.
+A exclusão total de `decisions.md` também será bloqueada. Adicionar entradas,
+editar o conteúdo de uma entrada ou riscá-la sem remover seu cabeçalho será
+permitido. Mudanças fora dos caminhos protegidos também serão permitidas.
 
 O diagnóstico explicará que o commit foi bloqueado, listará cada violação e
 oferecerá ações distintas para desfazer staging, restaurar conteúdo e usar
@@ -205,9 +210,13 @@ falhar. O teste não se limitará a comparar duas listas ou mensagens.
 
 Um teste isolado em repositório temporário cobrirá:
 
-- adições em `decisions.md` permitidas;
-- qualquer remoção de linha em `decisions.md` bloqueada, inclusive quando
-  acompanhada por mais adições;
+- adições de entradas em `decisions.md` permitidas;
+- edição e revogação por risco de uma entrada existente permitidas quando seu
+  cabeçalho `## ` permanece;
+- redução da quantidade de cabeçalhos `^## ` em `decisions.md` bloqueada,
+  inclusive quando acompanhada por mais linhas adicionadas;
+- sobrescrita de um arquivo com várias decisões pelo template sem entradas
+  bloqueada;
 - exclusão total de `decisions.md` bloqueada;
 - exclusão dos demais caminhos protegidos bloqueada;
 - renome para fora de `.ai/guidelines/domain/` bloqueado;
