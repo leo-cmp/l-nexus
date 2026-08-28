@@ -43,6 +43,58 @@ npx @leo-cmp/l-nexus update
 
 ---
 
+## Guarda de conteúdo protegido
+
+Em um repositório Git, a instalação tenta ativar um hook `pre-commit` que impede
+que deleções dos caminhos 🔒 sejam commitadas. Em `.ai/decisions.md`, a guarda
+também impede que a quantidade de decisões (cabeçalhos que começam com `## `,
+representados por `^## `) diminua; editar ou riscar uma decisão mantendo seu
+cabeçalho continua permitido.
+
+> A guarda protege a história Git, não a árvore de trabalho. Se um processo
+> apagar arquivos no disco, eles continuam ausentes até serem restaurados; a
+> guarda impede que a perda staged vire commit. A preservação durante uma
+> atualização é responsabilidade do instalador, enquanto a guarda funciona como
+> uma rede de segurança para a história.
+
+Desfaça primeiro apenas o staging:
+
+```bash
+git restore --staged -- <caminho>
+```
+
+Restaure do último commit somente quando também quiser substituir o conteúdo da
+árvore de trabalho:
+
+```bash
+git restore --source=HEAD --staged --worktree -- <caminho>
+```
+
+Uma remoção intencional pode ignorar a guarda uma vez:
+
+```bash
+git commit --no-verify
+```
+
+Hooks `pre-commit` existentes nunca são sobrescritos. O mesmo vale quando
+`core.hooksPath` aponta para fora do projeto: nesse caso, a instalação avisa e
+não escreve no diretório externo. Para ativar a proteção, encadeie manualmente
+`.agents/hooks/lnx-guard.sh` no hook efetivo.
+
+O stub instalado no diretório efetivo de hooks falha de forma segura quando a
+guarda versionada está ausente ou não é executável, inclusive durante uma
+atualização concorrente. A mensagem de bloqueio informa o arquivo `pre-commit`
+efetivo: use `git commit --no-verify` para liberar somente o commit atual ou,
+se o l-nexus não estiver mais em uso, remova esse stub.
+
+Em worktrees vinculadas, rode o instalador na worktree principal. Os hooks ficam
+no diretório Git compartilhado e, instalados a partir da principal, protegem
+todas as worktrees. Por serem compartilhados e fail-closed, eles também bloqueiam
+commits em uma worktree irmã cuja branch não contenha `.agents/`; nesse caso, as
+saídas explícitas são `git commit --no-verify` ou a remoção do stub compartilhado.
+
+---
+
 ## Estrutura instalada no projeto
 
 > 🔒 **Arquivos Locais do Projeto**: Criados uma única vez e **nunca** sobrescritos pelo `npx update`.  
@@ -66,11 +118,16 @@ projeto/
 │       ├── core/                 ← execution, planning, cli-delegation, testing, etc. (atualizado)
 │       └── stacks/               ← diretrizes por stack: Laravel, Tailwind, DaisyUI, etc. (atualizado)
 ├── ⚡ .agents/
+│   ├── hooks/
+│   │   └── lnx-guard.sh        ← guarda versionada de conteúdo protegido (atualizado)
 │   └── skills/                   ← skills de fluxo (lnx-*), gating (TDD, Debugging) e stacks
 ├── ⚡ .claude/
 │   └── skills -> ../.agents/skills
 └── ⚡ .mcp.json                  ← servidores MCP locais
 ```
+
+O stub não versionado que chama a guarda não faz parte dessa árvore copiada:
+ele reside no diretório efetivo de hooks determinado pelo Git.
 
 ---
 
