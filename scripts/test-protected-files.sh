@@ -16,73 +16,48 @@ fail() {
 }
 
 TARGET="$TMP_DIR/test-project"
+PROTECTED_LIST="$TMP_DIR/protected-paths.txt"
+UPDATE_OUTPUT="$TMP_DIR/update-output.txt"
 mkdir -p "$TARGET"
 
-# 1. Primeira instalação
+# Manter o alvo sem Git faz a instalacao da guarda pular legitimamente,
+# isolando este teste no contrato de preservacao do update.
 "$CLI" install "$TARGET" >/dev/null
+"$TARGET/.agents/hooks/lnx-guard.sh" --list-protected > "$PROTECTED_LIST"
 
-# 2. Gravar marcadores e conteúdos customizados em TODOS os arquivos protegidos
-cat > "$TARGET/.ai/project.md" <<'EOF'
-# 🔒 [PROJETO] Meu Projeto Customizado
-custom_marker: project-survived
-EOF
+[ -s "$PROTECTED_LIST" ] || fail "a guarda nao declarou caminhos protegidos"
 
-cat > "$TARGET/.ai/stack.md" <<'EOF'
-# 🔒 [PROJETO] Minhas Stacks
-custom_marker: stack-survived
-EOF
+while IFS= read -r protected; do
+    [ -n "$protected" ] || continue
+    case "$protected" in
+        */)
+            mkdir -p "$TARGET/$protected"
+            printf 'custom_marker: survived:%s\n' "$protected" > "$TARGET/${protected}.lnx-protected-sentinel"
+            ;;
+        *)
+            mkdir -p "$(dirname "$TARGET/$protected")"
+            printf 'custom_marker: survived:%s\n' "$protected" > "$TARGET/$protected"
+            ;;
+    esac
+done < "$PROTECTED_LIST"
 
-cat > "$TARGET/.ai/model-routing.yaml" <<'EOF'
-schema_version: 1
-custom_marker: routing-survived
-EOF
+"$CLI" update "$TARGET" > "$UPDATE_OUTPUT"
 
-cat > "$TARGET/.ai/session-memory.md" <<'EOF'
-# 🔒 [PROJETO] Memoria
-custom_marker: memory-survived
-EOF
+while IFS= read -r protected; do
+    [ -n "$protected" ] || continue
+    case "$protected" in
+        */) marker="$TARGET/${protected}.lnx-protected-sentinel" ;;
+        *) marker="$TARGET/$protected" ;;
+    esac
 
-cat > "$TARGET/.ai/decisions.md" <<'EOF'
-# 🔒 [PROJETO] Decisoes
-custom_marker: decisions-survived
-EOF
+    [ -f "$marker" ] || fail "$protected foi apagado no update"
+    grep -Fqx "custom_marker: survived:$protected" "$marker" ||
+        fail "$protected perdeu conteudo no update"
+    grep -Fqx "  ✓ $protected" "$UPDATE_OUTPUT" ||
+        fail "$protected nao apareceu no resumo canonico do instalador"
+done < "$PROTECTED_LIST"
 
-cat > "$TARGET/.ai/guidelines/domain/business-rules/index.md" <<'EOF'
-# 🔒 [PROJETO] Indice Customizado
-custom_marker: index-survived
-EOF
+[ -f "$TARGET/.ai/guidelines/domain/.lnx-protected-sentinel" ] ||
+    fail ".ai/guidelines/domain/ foi recriado depois de apagar conteudo local"
 
-cat > "$TARGET/.ai/guidelines/domain/business-rules/pagamentos.md" <<'EOF'
-# Regra Critica de Pagamentos
-custom_marker: rule-pagamentos-survived
-EOF
-
-# 3. Executar o update
-"$CLI" update "$TARGET" >/dev/null
-
-# 4. Validar que nenhum arquivo protegido foi apagado ou resetado
-grep -q "custom_marker: project-survived" "$TARGET/.ai/project.md" ||
-    fail ".ai/project.md foi sobrescrito no update"
-
-grep -q "custom_marker: stack-survived" "$TARGET/.ai/stack.md" ||
-    fail ".ai/stack.md foi sobrescrito no update"
-
-grep -q "custom_marker: routing-survived" "$TARGET/.ai/model-routing.yaml" ||
-    fail ".ai/model-routing.yaml foi sobrescrito no update"
-
-grep -q "custom_marker: memory-survived" "$TARGET/.ai/session-memory.md" ||
-    fail ".ai/session-memory.md foi sobrescrito no update"
-
-grep -q "custom_marker: decisions-survived" "$TARGET/.ai/decisions.md" ||
-    fail ".ai/decisions.md foi sobrescrito no update"
-
-grep -q "custom_marker: index-survived" "$TARGET/.ai/guidelines/domain/business-rules/index.md" ||
-    fail ".ai/guidelines/domain/business-rules/index.md foi sobrescrito no update"
-
-[ -f "$TARGET/.ai/guidelines/domain/business-rules/pagamentos.md" ] ||
-    fail ".ai/guidelines/domain/business-rules/pagamentos.md foi apagado no update"
-
-grep -q "custom_marker: rule-pagamentos-survived" "$TARGET/.ai/guidelines/domain/business-rules/pagamentos.md" ||
-    fail ".ai/guidelines/domain/business-rules/pagamentos.md perdeu conteudo no update"
-
-echo "scripts/test-protected-files.sh: ok (todos os 6 artefatos protegidos sobreviveram ao update)"
+echo "scripts/test-protected-files.sh: ok"
