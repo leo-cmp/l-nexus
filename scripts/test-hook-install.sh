@@ -131,6 +131,46 @@ test_symlinked_and_dangling_hooks_paths_are_rejected() {
     grep -Fq 'fora do projeto' "$output" || fail "aviso para symlink pendente ausente"
 }
 
+test_symlink_parent_escape_is_rejected() {
+    local repo="$TMP_DIR/symlink-parent-repo" external_root="$TMP_DIR/escape-external"
+    local output="$TMP_DIR/symlink-parent.log" escaped_hook
+    init_repo "$repo"
+    mkdir -p "$external_root/linked-directory"
+    ln -s "$external_root/linked-directory" "$repo/link"
+    git -C "$repo" config core.hooksPath 'link/../hooks'
+    escaped_hook="$external_root/hooks/pre-commit"
+
+    run_install "$repo" "$output" || fail "escape link/../hooks deveria ser rejeitado sem falhar o kit"
+    [ ! -e "$escaped_hook" ] || fail "escape link/../hooks escreveu fora do projeto"
+    grep -Fq 'fora do projeto' "$output" || fail "escape link/../hooks nao recebeu aviso externo"
+    ! grep -Fq 'Guarda de pre-commit do l-nexus instalada' "$output" ||
+        fail "escape link/../hooks alegou que a guarda foi instalada"
+}
+
+test_global_external_hooks_path_is_rejected() {
+    local repo="$TMP_DIR/global-external-repo" external="$TMP_DIR/global-external-hooks"
+    local global_config="$TMP_DIR/global.gitconfig" output="$TMP_DIR/global-external.log"
+    init_repo "$repo"
+    git -C "$repo" config --unset core.hooksPath
+    git config --file "$global_config" core.hooksPath "$external"
+
+    GIT_CONFIG_GLOBAL="$global_config" GIT_CONFIG_SYSTEM=/dev/null \
+        "$CLI" install "$repo" >"$output" 2>&1 || fail "hooksPath global externo deveria ser skip seguro"
+    [ ! -e "$external" ] || fail "hooksPath global externo foi criado ou alterado"
+    grep -Fq 'fora do projeto' "$output" || fail "aviso de hooksPath global externo ausente"
+    grep -Fq 'Guarda NAO instalada' "$output" || fail "hooksPath global externo alegou instalacao"
+}
+
+test_repository_and_hooks_path_with_spaces() {
+    local repo="$TMP_DIR/repo com espacos" output="$TMP_DIR/spaces.log"
+    local hook="$repo/hooks locais/pre-commit"
+    init_repo "$repo"
+    git -C "$repo" config core.hooksPath 'hooks locais'
+    run_install "$repo" "$output" || fail "repositorio e hooksPath com espacos deveriam funcionar"
+    [ -x "$hook" ] || fail "stub nao foi instalado em hooksPath com espacos"
+    grep -Fq "$hook" "$output" || fail "mensagem nao preservou caminho com espacos"
+}
+
 test_linked_worktree_is_rejected_with_guidance() {
     local main_repo="$TMP_DIR/worktree-main" linked_repo="$TMP_DIR/worktree-linked"
     local output="$TMP_DIR/worktree.log" common_hook
@@ -172,6 +212,33 @@ test_current_stub_is_preserved() {
     ! grep -Fq 'Hook pre-commit ja existe' "$output" || fail "stub atual recebeu falso aviso de conflito"
 }
 
+test_non_executable_current_stub_is_preserved_and_warned() {
+    local repo="$TMP_DIR/v1-non-executable" output="$TMP_DIR/v1-non-executable.log" hook checksum mode
+    init_repo "$repo"
+    hook="$repo/.git/hooks/pre-commit"
+    write_existing_hook "$hook" '# lnx-guard-stub v1'
+    chmod 640 "$hook"
+    checksum="$(cksum < "$hook")"
+    mode="$(file_mode "$hook")"
+    run_install "$repo" "$output" || fail "stub v1 sem execucao deveria ser preservado sem falhar"
+    assert_preserved "$hook" "$checksum" "$mode"
+    grep -Fq 'nao e executavel' "$output" || fail "stub v1 sem execucao nao foi diagnosticado"
+    grep -Fq 'chmod +x' "$output" || fail "stub v1 sem execucao nao recebeu acao manual"
+    ! grep -Fq 'Guarda de pre-commit do l-nexus ativa' "$output" || fail "stub sem execucao foi alegado como ativo"
+}
+
+test_zero_padded_current_stub_is_preserved_and_active() {
+    local repo="$TMP_DIR/v0001" output="$TMP_DIR/v0001.log" hook checksum mode
+    init_repo "$repo"
+    hook="$repo/.git/hooks/pre-commit"
+    write_existing_hook "$hook" '# lnx-guard-stub v0001'
+    checksum="$(cksum < "$hook")"
+    mode="$(file_mode "$hook")"
+    run_install "$repo" "$output" || fail "stub v0001 deveria ser comparado sem aritmetica"
+    assert_preserved "$hook" "$checksum" "$mode"
+    grep -Fq 'Guarda de pre-commit do l-nexus ativa' "$output" || fail "stub v0001 nao foi normalizado como atual"
+}
+
 test_old_stub_is_preserved_and_warned() {
     local repo="$TMP_DIR/v0" output="$TMP_DIR/v0.log" hook checksum mode
     init_repo "$repo"
@@ -197,6 +264,18 @@ test_newer_stub_is_preserved_without_downgrade() {
     grep -Fq 'Nao foi alterado nem sofreu downgrade' "$output" || fail "mensagem de nao-downgrade ausente"
 }
 
+test_huge_stub_version_is_preserved_without_overflow() {
+    local repo="$TMP_DIR/v-huge" output="$TMP_DIR/v-huge.log" hook checksum mode
+    init_repo "$repo"
+    hook="$repo/.git/hooks/pre-commit"
+    write_existing_hook "$hook" '# lnx-guard-stub v9223372036854775808'
+    checksum="$(cksum < "$hook")"
+    mode="$(file_mode "$hook")"
+    run_install "$repo" "$output" || fail "versao decimal grande nao deveria causar overflow"
+    assert_preserved "$hook" "$checksum" "$mode"
+    grep -Fq 'mais novo que este instalador' "$output" || fail "versao decimal grande nao foi classificada como posterior"
+}
+
 test_internal_regular_file_hooks_path_fails() {
     local repo="$TMP_DIR/invalid-internal" output="$TMP_DIR/invalid-internal.log"
     init_repo "$repo"
@@ -215,11 +294,17 @@ test_stub_fails_closed_without_guard
 test_internal_hooks_path_is_created
 test_absolute_external_hooks_path_is_rejected
 test_symlinked_and_dangling_hooks_paths_are_rejected
+test_symlink_parent_escape_is_rejected
+test_global_external_hooks_path_is_rejected
+test_repository_and_hooks_path_with_spaces
 test_linked_worktree_is_rejected_with_guidance
 test_foreign_hook_is_preserved
 test_current_stub_is_preserved
+test_non_executable_current_stub_is_preserved_and_warned
+test_zero_padded_current_stub_is_preserved_and_active
 test_old_stub_is_preserved_and_warned
 test_newer_stub_is_preserved_without_downgrade
+test_huge_stub_version_is_preserved_without_overflow
 test_internal_regular_file_hooks_path_fails
 
 echo "scripts/test-hook-install.sh: ok"
