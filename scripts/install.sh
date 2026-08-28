@@ -40,10 +40,14 @@ if (!path.isAbsolute(input)) process.exit(4);
 
 let resolved = path.parse(input).root;
 const components = input.slice(resolved.length).split('/');
+let crossedMissingComponent = false;
 
 for (const component of components) {
     if (!component || component === '.') continue;
     if (component === '..') {
+        // O kernel precisa atravessar o componente anterior antes de aplicar `..`.
+        // Se ele nao existe, missing/../hooks falha em vez de virar apenas hooks.
+        if (crossedMissingComponent) process.exit(4);
         resolved = path.dirname(resolved);
         continue;
     }
@@ -55,6 +59,7 @@ for (const component of components) {
     } catch (error) {
         if (error.code === 'ENOENT') {
             resolved = next;
+            crossedMissingComponent = true;
             continue;
         }
         process.exit(4);
@@ -79,34 +84,6 @@ for (const component of components) {
 }
 
 process.stdout.write(resolved);
-NODE
-}
-
-path_contains_symlink_component() {
-    node - "$1" <<'NODE'
-const fs = require('node:fs');
-const path = require('node:path');
-
-const input = process.argv[2];
-if (!path.isAbsolute(input)) process.exit(2);
-
-let cursor = path.parse(input).root;
-for (const component of input.slice(cursor.length).split('/')) {
-    if (!component || component === '.') continue;
-    if (component === '..') {
-        cursor = path.dirname(cursor);
-        continue;
-    }
-    cursor = path.join(cursor, component);
-    try {
-        const entry = fs.lstatSync(cursor);
-        if (entry.isSymbolicLink()) process.exit(0);
-        if (!entry.isDirectory()) process.exit(2);
-    } catch (error) {
-        if (error.code !== 'ENOENT') process.exit(2);
-    }
-}
-process.exit(1);
 NODE
 }
 
@@ -267,8 +244,7 @@ install_guard_hook() {
     # poderia mover a escrita para fora da raiz validada.
     if ! revalidated_hooks_dir="$(physical_path_allow_missing "$hooks_candidate")" ||
         [ "$revalidated_hooks_dir" != "$hooks_dir" ] ||
-        ! path_is_within "$revalidated_hooks_dir" "$target_root" ||
-        path_contains_symlink_component "$hooks_candidate"; then
+        ! path_is_within "$revalidated_hooks_dir" "$target_root"; then
         echo "ERRO: o diretorio de hooks mudou durante a instalacao: $hooks_candidate" >&2
         return 1
     fi
@@ -288,7 +264,6 @@ install_guard_hook() {
     if ! revalidated_hooks_dir="$(physical_path_allow_missing "$hooks_candidate")" ||
         [ "$revalidated_hooks_dir" != "$hooks_dir" ] ||
         ! path_is_within "$revalidated_hooks_dir" "$target_root" ||
-        path_contains_symlink_component "$hooks_candidate" ||
         ! revalidated_identity="$(directory_identity "$revalidated_hooks_dir")" ||
         [ "$revalidated_identity" != "$hooks_identity" ]; then
         echo "ERRO: o diretorio de hooks mudou antes da criacao do stub: $hooks_candidate" >&2
@@ -340,7 +315,6 @@ EOF
     if ! revalidated_hooks_dir="$(physical_path_allow_missing "$hooks_candidate")" ||
         [ "$revalidated_hooks_dir" != "$hooks_dir" ] ||
         ! path_is_within "$revalidated_hooks_dir" "$target_root" ||
-        path_contains_symlink_component "$hooks_candidate" ||
         ! revalidated_identity="$(directory_identity "$revalidated_hooks_dir")" ||
         [ "$revalidated_identity" != "$hooks_identity" ]; then
         rm -f "$temporary_hook" || true

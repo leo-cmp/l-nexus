@@ -96,6 +96,34 @@ test_internal_hooks_path_is_created() {
     [ -x "$hook" ] || fail "stub nao foi criado em hooksPath interno"
 }
 
+test_internal_symlink_hooks_path_is_allowed() {
+    local repo="$TMP_DIR/internal-symlink" output="$TMP_DIR/internal-symlink.log"
+    local hooks_dir="$TMP_DIR/internal-symlink/hooks-reais" hook
+    init_repo "$repo"
+    mkdir -p "$hooks_dir"
+    ln -s "$hooks_dir" "$repo/hooks-alias"
+    git -C "$repo" config core.hooksPath hooks-alias
+    hook="$hooks_dir/pre-commit"
+
+    run_install "$repo" "$output" || fail "symlink interno para destino fisico interno deveria funcionar"
+    [ -x "$hook" ] || fail "stub nao foi instalado no destino do symlink interno"
+    grep -Fq "$hook" "$output" || fail "instalacao nao informou o destino fisico do symlink interno"
+}
+
+test_missing_parent_traversal_fails() {
+    local repo="$TMP_DIR/missing-parent" output="$TMP_DIR/missing-parent.log"
+    init_repo "$repo"
+    git -C "$repo" config core.hooksPath 'missing/../hooks'
+
+    if run_install "$repo" "$output"; then
+        fail "missing/../hooks deveria falhar como falha no kernel"
+    fi
+    [ ! -e "$repo/hooks/pre-commit" ] || fail "missing/../hooks criou hook por normalizacao lexical"
+    [ ! -e "$repo/missing" ] || fail "missing/../hooks criou componente inexistente"
+    ! grep -Fq 'l-nexus instalado com sucesso' "$output" || fail "missing/../hooks imprimiu banner de sucesso"
+    grep -Fq 'ERRO:' "$output" || fail "missing/../hooks nao produziu erro explicito"
+}
+
 test_absolute_external_hooks_path_is_rejected() {
     local repo="$TMP_DIR/external-repo" external="$TMP_DIR/external-hooks" output="$TMP_DIR/external.log"
     init_repo "$repo"
@@ -292,6 +320,8 @@ test_non_git_directory_skips_silently
 test_main_repo_installs_executable_stub
 test_stub_fails_closed_without_guard
 test_internal_hooks_path_is_created
+test_internal_symlink_hooks_path_is_allowed
+test_missing_parent_traversal_fails
 test_absolute_external_hooks_path_is_rejected
 test_symlinked_and_dangling_hooks_paths_are_rejected
 test_symlink_parent_escape_is_rejected
