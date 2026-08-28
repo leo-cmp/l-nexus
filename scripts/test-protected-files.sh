@@ -60,24 +60,35 @@ done < "$PROTECTED_LIST"
 # A entrada de diretorio e validada pelo mesmo loop; sua sentinela fica
 # diretamente em .ai/guidelines/domain/, fora de business-rules/.
 
-PACKAGE_COPY="$TMP_DIR/broken-package"
-BROKEN_TARGET="$TMP_DIR/broken-target"
-BROKEN_STDOUT="$TMP_DIR/broken-stdout.txt"
-BROKEN_STDERR="$TMP_DIR/broken-stderr.txt"
-mkdir -p "$PACKAGE_COPY/scripts" "$BROKEN_TARGET"
-cp -R "$ROOT_DIR/src" "$PACKAGE_COPY/src"
-cp "$ROOT_DIR/scripts/install.sh" "$PACKAGE_COPY/scripts/install.sh"
-cp "$ROOT_DIR/VERSION" "$PACKAGE_COPY/VERSION"
-printf '#!/usr/bin/env bash\nexit 23\n' > "$PACKAGE_COPY/src/.agents/hooks/lnx-guard.sh"
-chmod +x "$PACKAGE_COPY/src/.agents/hooks/lnx-guard.sh"
+assert_projection_failure() {
+    local case_name="$1"
+    local guard_status="$2"
+    local expected_error="$3"
+    local package_copy="$TMP_DIR/package-$case_name"
+    local broken_target="$TMP_DIR/target-$case_name"
+    local stdout_file="$TMP_DIR/stdout-$case_name.txt"
+    local stderr_file="$TMP_DIR/stderr-$case_name.txt"
 
-if "$PACKAGE_COPY/scripts/install.sh" "$BROKEN_TARGET" > "$BROKEN_STDOUT" 2> "$BROKEN_STDERR"; then
-    fail "o instalador aceitou falha ao projetar caminhos protegidos"
-fi
-grep -q 'ERRO:' "$BROKEN_STDERR" ||
-    fail "a falha da projecao nao produziu diagnostico em stderr"
-if grep -q 'l-nexus instalado com sucesso' "$BROKEN_STDOUT" "$BROKEN_STDERR"; then
-    fail "o instalador anunciou sucesso depois da falha da projecao"
-fi
+    mkdir -p "$package_copy/scripts" "$broken_target"
+    cp -R "$ROOT_DIR/src" "$package_copy/src"
+    cp "$ROOT_DIR/scripts/install.sh" "$package_copy/scripts/install.sh"
+    cp "$ROOT_DIR/VERSION" "$package_copy/VERSION"
+    printf '#!/usr/bin/env bash\nexit %s\n' "$guard_status" > "$package_copy/src/.agents/hooks/lnx-guard.sh"
+    chmod +x "$package_copy/src/.agents/hooks/lnx-guard.sh"
+
+    if "$package_copy/scripts/install.sh" "$broken_target" > "$stdout_file" 2> "$stderr_file"; then
+        fail "o instalador aceitou a projecao protegida invalida: $case_name"
+    fi
+    grep -Fq 'ERRO:' "$stderr_file" ||
+        fail "a projecao $case_name nao produziu ERRO em stderr"
+    grep -Fq "$expected_error" "$stderr_file" ||
+        fail "a projecao $case_name nao explicou o erro esperado"
+    if grep -Fq 'l-nexus instalado com sucesso' "$stdout_file" "$stderr_file"; then
+        fail "o instalador anunciou sucesso depois da projecao $case_name"
+    fi
+}
+
+assert_projection_failure "exit-nonzero" 23 "nao foi possivel obter a lista canonica"
+assert_projection_failure "empty-output" 0 "lista canonica de caminhos protegidos esta vazia"
 
 echo "scripts/test-protected-files.sh: ok"
