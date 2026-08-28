@@ -450,13 +450,22 @@ if [ -f "$TARGET/.gitignore" ]; then
     fi
 fi
 
+if ! protected_paths="$("$SRC_DIR/.agents/hooks/lnx-guard.sh" --list-protected)"; then
+    echo "ERRO: nao foi possivel obter a lista canonica de caminhos protegidos." >&2
+    exit 1
+fi
+if [ -z "$protected_paths" ]; then
+    echo "ERRO: a lista canonica de caminhos protegidos esta vazia." >&2
+    exit 1
+fi
+
 echo "=== l-nexus instalado com sucesso ==="
 echo "Versão: $(cat "$ROOT_DIR/VERSION")"
 echo ""
 echo "🔒 Configurações Locais Protegidas (preservadas pelo npx update):"
 while IFS= read -r protected; do
     [ -n "$protected" ] && echo "  ✓ $protected"
-done < <("$SRC_DIR/.agents/hooks/lnx-guard.sh" --list-protected)
+done <<< "$protected_paths"
 echo ""
 echo "⚡ Componentes do Framework Atualizados:"
 echo "  ✓ .ai/roles/"

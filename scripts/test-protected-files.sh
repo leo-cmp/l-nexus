@@ -57,7 +57,27 @@ while IFS= read -r protected; do
         fail "$protected nao apareceu no resumo canonico do instalador"
 done < "$PROTECTED_LIST"
 
-[ -f "$TARGET/.ai/guidelines/domain/.lnx-protected-sentinel" ] ||
-    fail ".ai/guidelines/domain/ foi recriado depois de apagar conteudo local"
+# A entrada de diretorio e validada pelo mesmo loop; sua sentinela fica
+# diretamente em .ai/guidelines/domain/, fora de business-rules/.
+
+PACKAGE_COPY="$TMP_DIR/broken-package"
+BROKEN_TARGET="$TMP_DIR/broken-target"
+BROKEN_STDOUT="$TMP_DIR/broken-stdout.txt"
+BROKEN_STDERR="$TMP_DIR/broken-stderr.txt"
+mkdir -p "$PACKAGE_COPY/scripts" "$BROKEN_TARGET"
+cp -R "$ROOT_DIR/src" "$PACKAGE_COPY/src"
+cp "$ROOT_DIR/scripts/install.sh" "$PACKAGE_COPY/scripts/install.sh"
+cp "$ROOT_DIR/VERSION" "$PACKAGE_COPY/VERSION"
+printf '#!/usr/bin/env bash\nexit 23\n' > "$PACKAGE_COPY/src/.agents/hooks/lnx-guard.sh"
+chmod +x "$PACKAGE_COPY/src/.agents/hooks/lnx-guard.sh"
+
+if "$PACKAGE_COPY/scripts/install.sh" "$BROKEN_TARGET" > "$BROKEN_STDOUT" 2> "$BROKEN_STDERR"; then
+    fail "o instalador aceitou falha ao projetar caminhos protegidos"
+fi
+grep -q 'ERRO:' "$BROKEN_STDERR" ||
+    fail "a falha da projecao nao produziu diagnostico em stderr"
+if grep -q 'l-nexus instalado com sucesso' "$BROKEN_STDOUT" "$BROKEN_STDERR"; then
+    fail "o instalador anunciou sucesso depois da falha da projecao"
+fi
 
 echo "scripts/test-protected-files.sh: ok"
