@@ -31,6 +31,21 @@ count_decision_entries() {
     grep -c '^## ' || true
 }
 
+block_on_git_error() {
+    local operation="$1"
+
+    cat >&2 <<EOF
+l-nexus: commit bloqueado porque nao foi possivel inspecionar o index do Git.
+A guarda falha de forma segura quando o Git retorna erro durante a verificacao.
+Etapa que falhou: $operation
+
+Corrija o repositorio ou o index e tente novamente. Para ignorar a guarda apenas
+neste commit, use conscientemente:
+  git commit --no-verify
+EOF
+    exit 1
+}
+
 if [ "${1:-}" = "--list-protected" ]; then
     list_protected
     exit 0
@@ -42,6 +57,26 @@ if [ "$#" -gt 0 ]; then
 fi
 
 violations=""
+deleted_paths_file=""
+
+cleanup() {
+    if [ -n "$deleted_paths_file" ]; then
+        rm -f "$deleted_paths_file"
+    fi
+}
+trap cleanup EXIT HUP INT TERM
+
+if deleted_paths_file="$(mktemp "${TMPDIR:-/tmp}/lnx-guard-deletions.XXXXXX")"; then
+    :
+else
+    block_on_git_error "criacao do arquivo temporario para inspecionar delecoes staged"
+fi
+
+if git diff --cached --name-only -z --diff-filter=D --no-renames -- > "$deleted_paths_file"; then
+    :
+else
+    block_on_git_error "git diff das delecoes staged"
+fi
 
 while IFS= read -r -d '' deleted; do
     for rule in "${PROTECTED_RULES[@]}"; do
@@ -51,26 +86,89 @@ while IFS= read -r -d '' deleted; do
             break
         fi
     done
-done < <(git diff --cached --name-only -z --diff-filter=D --no-renames --)
+done < "$deleted_paths_file"
 
 for rule in "${PROTECTED_RULES[@]}"; do
     policy="${rule%%|*}"
     protected="${rule#*|}"
     [ "$policy" = 'append-only' ] || continue
 
-    if ! git diff --cached --quiet -- "$protected"; then
-        head_entries=0
-        staged_entries=0
+    if git diff --cached --quiet -- "$protected"; then
+        staged_diff_status=0
+    else
+        staged_diff_status=$?
+    fi
 
-        if git cat-file -e "HEAD:$protected" 2>/dev/null; then
-            head_entries="$(git show "HEAD:$protected" | count_decision_entries)"
+    case "$staged_diff_status" in
+        0)
+            continue
+            ;;
+        1)
+            ;;
+        *)
+            block_on_git_error "git diff de $protected"
+            ;;
+    esac
+
+    head_entries=0
+    staged_entries=0
+
+    if git rev-parse --verify --quiet HEAD >/dev/null; then
+        head_status=0
+    else
+        head_status=$?
+    fi
+
+    case "$head_status" in
+        0)
+            if head_listing="$(git ls-tree --name-only HEAD -- "$protected")"; then
+                :
+            else
+                block_on_git_error "git ls-tree de HEAD para $protected"
+            fi
+
+            if [ "$head_listing" = "$protected" ]; then
+                if git cat-file -e "HEAD:$protected" 2>/dev/null; then
+                    :
+                else
+                    block_on_git_error "git cat-file de HEAD para $protected"
+                fi
+
+                if head_entries="$(git show "HEAD:$protected" | count_decision_entries)"; then
+                    :
+                else
+                    block_on_git_error "git show de HEAD para $protected"
+                fi
+            fi
+            ;;
+        1)
+            ;;
+        *)
+            block_on_git_error "git rev-parse de HEAD"
+            ;;
+    esac
+
+    if staged_listing="$(git ls-files -- "$protected")"; then
+        :
+    else
+        block_on_git_error "git ls-files do index para $protected"
+    fi
+
+    if [ "$staged_listing" = "$protected" ]; then
+        if git cat-file -e ":$protected" 2>/dev/null; then
+            :
+        else
+            block_on_git_error "git cat-file do index para $protected"
         fi
 
-        if git cat-file -e ":$protected" 2>/dev/null; then
-            staged_entries="$(git show ":$protected" | count_decision_entries)"
-            if [ "$staged_entries" -lt "$head_entries" ]; then
-                violations+="  [$((head_entries - staged_entries)) entradas removidas] $protected"$'\n'
-            fi
+        if staged_entries="$(git show ":$protected" | count_decision_entries)"; then
+            :
+        else
+            block_on_git_error "git show do index para $protected"
+        fi
+
+        if [ "$staged_entries" -lt "$head_entries" ]; then
+            violations+="  [$((head_entries - staged_entries)) entradas removidas] $protected"$'\n'
         fi
     fi
 done

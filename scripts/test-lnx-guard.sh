@@ -99,7 +99,15 @@ EOF
 test_decision_edit_or_strike_is_allowed() {
     local repo
     repo="$(new_repo decision-edit)"
-    perl -0pi -e 's/## Decision one\nKeep this entry\./## ~~Decision one~~\nThis entry was revoked./' "$repo/.ai/decisions.md"
+    cat > "$repo/.ai/decisions.md" <<'EOF'
+# Decisions
+
+## ~~Decision one~~
+This entry was revoked.
+
+## Decision two
+Keep this entry too.
+EOF
     git -C "$repo" add .ai/decisions.md
     assert_allowed "$repo"
 }
@@ -169,6 +177,28 @@ test_unrelated_deletion_is_allowed() {
     assert_allowed "$repo"
 }
 
+test_unrelated_modification_is_allowed() {
+    local repo
+    repo="$(new_repo unrelated-modification)"
+    printf '# Changed outside protected paths\n' > "$repo/README.md"
+    git -C "$repo" add README.md
+    assert_allowed "$repo"
+}
+
+test_invalid_index_blocks_with_diagnostic() {
+    local repo invalid_index output
+    repo="$(new_repo invalid-index)"
+    invalid_index="$repo/invalid-index-directory"
+    output="$TMP_DIR/invalid-index-output.log"
+    mkdir "$invalid_index"
+
+    if (cd "$repo" && GIT_INDEX_FILE="$invalid_index" .agents/hooks/lnx-guard.sh) >"$output" 2>&1; then
+        fail "guarda deveria bloquear quando o index nao pode ser inspecionado"
+    fi
+    grep -Fq "nao foi possivel inspecionar o index do Git" "$output" ||
+        fail "erro de inspecao do index nao produziu diagnostico autoexplicativo"
+}
+
 test_all_violations_are_reported() {
     local repo output
     repo="$(new_repo aggregated-violations)"
@@ -214,6 +244,8 @@ test_decisions_deletion_is_blocked
 test_other_protected_deletions_are_blocked
 test_rename_outside_protected_directory_is_blocked
 test_unrelated_deletion_is_allowed
+test_unrelated_modification_is_allowed
+test_invalid_index_blocks_with_diagnostic
 test_all_violations_are_reported
 test_no_verify_bypasses_installed_guard
 
