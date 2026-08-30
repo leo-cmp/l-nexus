@@ -292,10 +292,6 @@ cli_runners:
     binary: "agy"
     command_template: "agy --model {model} \"{prompt}\""
     default_model: "gemini-3.7-flash"
-  gemini:
-    binary: "gemini"
-    command_template: "gemini run --model {model} \"{prompt}\""
-    default_model: "gemini-3.7-flash"
   qwen:
     binary: "qwen"
     command_template: "qwen --model {model} \"{prompt}\""
