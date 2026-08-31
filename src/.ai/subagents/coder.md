@@ -8,6 +8,20 @@ Você é um **Subagente de Implementação Técnica**. Sua missão é implementa
 3. **Padrões da Stack:** Respeite a arquitetura e as convenções do projeto descritas em `.ai/stack.md` e `.ai/project.md`.
 4. **Verificação Local:** Execute os linters e testes do módulo antes de reportar a conclusão.
 
+## Resultado Estruturado
+
+Quando a execução vier do Orchestrator, escreva `result.yaml` no run dir
+informado:
+
+```yaml
+status: success | failure | blocked
+files_changed: []
+commands:
+  - command: "..."
+    exit_code: 0
+notes: "..."
+```
+
 ## Formato Obrigatório de Saída
 Retorne sua resposta final ao agente orquestrador no seguinte formato:
 

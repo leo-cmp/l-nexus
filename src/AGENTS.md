@@ -45,7 +45,8 @@ Se o humano iniciar a mensagem com um dos comandos abaixo, a IA deve carregar a 
 ### 📋 Planejamento & Tasks (`/lnx-plano-*` e `/lnx-task-*`)
 - `/lnx-plano-criar`: Ativa a skill `lnx-plano-criar` para desenhar o plano de uma nova fase local (`.planning/PLAN_VN/plan.md`).
 - `/lnx-task-criar`: Ativa a skill `lnx-task-criar` para gerar uma nova tarefa em `.planning/PLAN_VN/tasks/task_X_Y.md` usando o template.
-- `/lnx-task-executar`: Ativa a skill `lnx-task-executar` para executar a próxima tarefa do plano.
+- `/lnx-task-executar`: Ativa a skill `lnx-task-executar` para executar a próxima tarefa do plano. Se a task tiver `model_plan.schema: 2`, encaminha para `lnx-orchestrator`.
+- `/lnx-orchestrator`: Ativa a skill `lnx-orchestrator` para coordenar a execução de uma task já roteada — delega executor, tester e reviewer em terminais visíveis, coleta resultados estruturados e aplica os gates de rework/upgrade.
 - `/lnx-task-revisar`: Ativa a skill `lnx-task-revisar` para fazer code review leve do próprio diff.
 
 ### ⚙️ Configuração & Ferramentas (`/lnx-configurar-*`, `/lnx-nexus-*`, etc.)
@@ -67,6 +68,7 @@ Se o humano iniciar a mensagem com um dos comandos abaixo, a IA deve carregar a 
 > - **Subagentes & Delegação:**
 >   - Para isolamento de tarefas ou subagentes, consulte `.ai/subagents/protocol.md`.
 >   - Para delegação a CLIs externas no terminal (`codex`, `claude`, `opencode`, `agy`, etc.), consulte `.ai/guidelines/core/cli-delegation.md`.
+>   - Para coordenar executor/tester/reviewer de uma task roteada, consulte `.ai/guidelines/core/orchestration.md`. A delegação de agentes principais prefere **terminal visível** (`.agents/scripts/lnx-run.sh`); nunca execute um agente em background escondido.
 
 ## Níveis de Complexidade
 
@@ -202,7 +204,8 @@ Qualquer agente de IA pode assumir qualquer cargo. A divisão orienta o foco e c
 |---|---|
 | `.ai/project.md` nao existe, ou humano pede para configurar/revisar o projeto (stack, regras de negocio, ambiente) | `project-planner` |
 | entrada inicial, roteamento, recomendacao de agente/modelo | `model-router` |
-| requisitos, fases, planos, tasks, issues, decisao de escopo | `technical-lead` |
+| requisitos, fases, planos, tasks, issues, decisao de escopo, roteamento de modelos da task | `technical-lead` |
+| coordenar execucao de task ja roteada: executor, tester, reviewer, rework, upgrade | `orchestrator` |
 | descoberta de produto, regra ambigua, criterio de negocio | `product-analyst` |
 | implementacao backend + frontend | `fullstack-engineer` |
 | implementacao backend/API/jobs/services | `backend-engineer` |
