@@ -204,9 +204,24 @@ assiste; quem conduz é o Orchestrator.
 # o Orchestrator digita na sessão
 .agents/scripts/lnx-run.sh send <run-dir> --text "REWORK: corrija TEST-001 ..."
 
+# espera ele parar de escrever — nunca espera um texto específico
+.agents/scripts/lnx-run.sh wait-idle <run-dir> --quiet-for 4 --timeout 300
+
 # e lê o que apareceu, sem códigos de escape
 .agents/scripts/lnx-run.sh read <run-dir> --plain --tail 40
 ```
+
+**Conclusão é detectada por quietude, nunca por formato.** Cada agente responde
+do seu jeito, e as instruções do próprio projeto mudam esse formato outra vez.
+Qualquer padrão de texto que o l-nexus fixasse estaria errado em outro runtime
+ou em outro projeto. Por isso `wait-idle` observa o output parar de crescer e
+não olha o que ele diz. Ele devolve `4` quando a sessão terminou, o que é
+diferente de estar ociosa e viva.
+
+Para ler, `--plain --tail N` dá o estado atual da tela e é o mais confiável.
+`--since <offset>` (o offset vem do próprio `send`) recorta o log cru a partir
+de um ponto, mas uma TUI de tela cheia repinta: a fatia limita o volume, não
+isola a mensagem nova.
 
 Só `--io broker` aceita entrada. O motivo é técnico e vale entender: um pipe
 tira o TTY (agente interativo não desenha nada) e o `script` dá TTY mas não dá

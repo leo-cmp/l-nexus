@@ -45,7 +45,9 @@ Usage:
                    [--io auto|broker|tty|pipe]
   lnx-run.sh send RUN_DIR --text TEXT | --text-file FILE [--no-enter] [--delay S]
                       [--paste auto|always|never]
-  lnx-run.sh read RUN_DIR [--tail N] [--plain]
+  lnx-run.sh read RUN_DIR [--tail N] [--since BYTES] [--plain]
+  lnx-run.sh wait-idle RUN_DIR [--quiet-for S] [--timeout S] [--poll S]
+                       [--await-activity S]
   lnx-run.sh supervise RUN_DIR
   lnx-run.sh status RUN_DIR
   lnx-run.sh wait RUN_DIR [--timeout SECONDS]
@@ -359,6 +361,10 @@ command_send() {
     fi
     [ -p "$run_dir/control.in" ] || die "send: control channel is not available in $run_dir" 3
 
+    local offset
+    offset="$( [ -f "$run_dir/output.log" ] && wc -c < "$run_dir/output.log" || printf '0' )"
+    offset="${offset// /}"
+
     # A TUI processes input key by key and redraws as it goes, so dumping a long
     # string raw can drop or reorder characters. Bracketed paste makes the whole
     # text arrive as one paste event instead. It is only used when the session
@@ -386,25 +392,38 @@ command_send() {
         printf '\r' > "$run_dir/control.in"
     fi
     printf 'sent=%s bytes paste=%s\n' "${#text}" "$paste"
+    # Reported so the caller can `read --since` and see only what followed.
+    printf 'bytes=%s\n' "$offset"
 }
 
 # Reads what the session printed. `--plain` strips terminal escape sequences,
 # which is what an orchestrator wants; the raw log stays untouched on disk.
 command_read() {
-    local run_dir="${1:-}" tail_lines=0 plain=false
+    local run_dir="${1:-}" tail_lines=0 plain=false since=0
     [ -n "$run_dir" ] || die 'read: RUN_DIR is required' 2
     shift || true
     while [ "$#" -gt 0 ]; do
         case "$1" in
             --tail) tail_lines="${2:-0}"; shift 2 ;;
+            --since) since="${2:-0}"; shift 2 ;;
             --plain) plain=true; shift ;;
             *) die "read: unknown option $1" 2 ;;
         esac
     done
     [ -f "$run_dir/output.log" ] || die "read: no output captured yet in $run_dir" 3
     case "$tail_lines" in ''|*[!0-9]*) die 'read: --tail must be a non-negative integer' 2 ;; esac
+    case "$since" in ''|*[!0-9]*) die 'read: --since must be a non-negative byte offset' 2 ;; esac
 
-    local stream="$run_dir/output.log"
+    local stream="$run_dir/output.log" sliced=''
+    # `--since` slices the RAW log, because that is the only offset a caller can
+    # capture reliably; stripping escapes first would shift every position.
+    if [ "$since" -gt 0 ]; then
+        sliced="$(mktemp "${TMPDIR:-/tmp}/lnx-read.XXXXXX")" || die 'read: cannot buffer the slice'
+        # shellcheck disable=SC2064
+        trap "rm -f '$sliced'" EXIT
+        tail -c "+$((since + 1))" "$stream" > "$sliced"
+        stream="$sliced"
+    fi
     if [ "$plain" = true ]; then
         tr -d '\r' < "$stream" \
             | sed -e 's/\x1b\][0-9]*;[^\x07]*\x07//g' \
@@ -415,6 +434,71 @@ command_read() {
         return 0
     fi
     if [ "$tail_lines" -gt 0 ]; then tail -n "$tail_lines" "$stream"; else cat "$stream"; fi
+}
+
+# Waits until the delegated agent stops producing output. Deliberately based on
+# quietness, never on matching text: every agent answers in its own shape, and a
+# project's own instructions change that shape further, so any pattern the
+# l-nexus hardcoded would be wrong somewhere.
+command_wait_idle() {
+    local run_dir="${1:-}" quiet_for=3 timeout=0 poll=1 await_activity=5
+    [ -n "$run_dir" ] || die 'wait-idle: RUN_DIR is required' 2
+    shift || true
+    while [ "$#" -gt 0 ]; do
+        case "$1" in
+            --quiet-for) quiet_for="${2:-3}"; shift 2 ;;
+            --timeout) timeout="${2:-0}"; shift 2 ;;
+            --poll) poll="${2:-1}"; shift 2 ;;
+            --await-activity) await_activity="${2:-5}"; shift 2 ;;
+            *) die "wait-idle: unknown option $1" 2 ;;
+        esac
+    done
+    [ -d "$run_dir" ] || die "wait-idle: run directory not found: $run_dir" 2
+    for value in "$quiet_for" "$timeout" "$poll" "$await_activity"; do
+        case "$value" in ''|*[!0-9]*) die 'wait-idle: durations must be non-negative integers' 2 ;; esac
+    done
+    [ "$poll" -gt 0 ] || die 'wait-idle: --poll must be at least 1' 2
+
+    local log="$run_dir/output.log"
+    local size previous quiet=0 elapsed=0 state started=false
+
+    previous="$( [ -f "$log" ] && wc -c < "$log" || printf '0' )"
+    while :; do
+        state="$(effective_status "$run_dir")"
+        size="$( [ -f "$log" ] && wc -c < "$log" || printf '0' )"
+
+        if [ "$size" != "$previous" ]; then
+            started=true
+            quiet=0
+            previous="$size"
+        else
+            quiet=$((quiet + poll))
+        fi
+
+        case "$state" in
+            done|failed|orphaned)
+                printf 'state=%s\nidle=true\n' "$state"
+                return 4
+                ;;
+        esac
+
+        # Before any output appeared, quietness proves nothing: the agent may
+        # simply not have started yet.
+        if [ "$started" = true ] || [ "$elapsed" -ge "$await_activity" ]; then
+            if [ "$quiet" -ge "$quiet_for" ]; then
+                printf 'state=%s\nidle=true\nquiet_for=%s\nbytes=%s\n' "$state" "$quiet" "$size"
+                return 0
+            fi
+        fi
+
+        if [ "$timeout" -gt 0 ] && [ "$elapsed" -ge "$timeout" ]; then
+            printf 'state=%s\nidle=false\n' "$state"
+            die "wait-idle: still producing output after ${timeout}s ($run_dir)" 3
+        fi
+
+        sleep "$poll"
+        elapsed=$((elapsed + poll))
+    done
 }
 
 # --- status / wait ---------------------------------------------------------
@@ -694,6 +778,7 @@ case "${1:-}" in
     send) shift; command_send "$@" ;;
     read) shift; command_read "$@" ;;
     wait) shift; command_wait "$@" ;;
+    wait-idle) shift; command_wait_idle "$@" ;;
     --help|-h|'') usage ;;
     *) usage >&2; die "unknown subcommand: $1" 2 ;;
 esac

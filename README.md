@@ -244,10 +244,16 @@ O ponto da orquestração não é o humano digitar em várias janelas: é o
 Orchestrator **abrir e conduzir** os outros agentes, enquanto você assiste.
 
 ```bash
-lnx-run.sh start ... --io broker --detach     # abre e devolve o controle
-lnx-run.sh send  <run-dir> --text "REWORK: ..."  # o Orchestrator digita
-lnx-run.sh read  <run-dir> --plain --tail 40     # e lê, sem escape codes
+lnx-run.sh start     ... --io broker --detach        # abre e devolve o controle
+lnx-run.sh send      <run-dir> --text "REWORK: ..."  # o Orchestrator digita
+lnx-run.sh wait-idle <run-dir> --quiet-for 4         # espera ele parar de escrever
+lnx-run.sh read      <run-dir> --plain --tail 40     # e lê, sem escape codes
 ```
+
+**Nada disso espera um formato de resposta.** Cada agente responde do seu jeito,
+e as instruções do próprio projeto mudam esse formato de novo — qualquer padrão
+de texto fixado no l-nexus quebraria em outro runtime. Por isso a conclusão é
+detectada por **quietude do output**, não por conteúdo.
 
 Isso exige ser dono do PTY. Um pipe tira o TTY e o agente interativo não desenha
 nada; `script` dá TTY mas não dá entrada; injetar em tty alheio precisaria do

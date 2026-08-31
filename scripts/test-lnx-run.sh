@@ -299,6 +299,42 @@ output="$(headless "$RUNNER" start \
 run_dir="$(sed -n 's/^run_dir=//p' <<<"$output")"
 "$RUNNER" send "$run_dir" --text "oi" 2>/dev/null && fail "send was accepted on a pipe run"
 
+# --- knowing the agent finished, without assuming how it answers -----------
+
+output="$(headless "$RUNNER" start \
+    --task TASK-IDLE --role executor --runner fake --runner-bin fake-repl \
+    --cwd "$PROJECT" --io broker --terminal custom \
+    --terminal-cmd fake-terminal-exec --terminal-cmd '{title}' --terminal-cmd '{cwd}' \
+    --terminal-cmd '{command}' --detach 2>&1)"
+[ $? -eq 0 ] || fail "the idle scenario did not start: $output"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output")"
+deadline=$((SECONDS + 15))
+while [ "$(cat "$run_dir/status" 2>/dev/null)" != running ] && [ "$SECONDS" -lt "$deadline" ]; do :; done
+
+idle="$("$RUNNER" wait-idle "$run_dir" --quiet-for 2 --timeout 30)"
+[ $? -eq 0 ] || fail "wait-idle did not settle on a quiet session"
+grep -q '^idle=true$' <<<"$idle" || fail "wait-idle did not report an idle session"
+grep -q '^state=running$' <<<"$idle" || fail "wait-idle lost the session state"
+
+# The offset reported by send is what makes it possible to read only the reply,
+# without matching any text the agent produced.
+send_output="$("$RUNNER" send "$run_dir" --text "mensagem-nova")"
+offset="$(sed -n 's/^bytes=//p' <<<"$send_output")"
+[ -n "$offset" ] || fail "send did not report the log offset"
+"$RUNNER" wait-idle "$run_dir" --quiet-for 2 --timeout 30 >/dev/null ||
+    fail "wait-idle never settled after a send"
+"$RUNNER" read "$run_dir" --since "$offset" --plain | grep -q 'ECO\[mensagem-nova\]' ||
+    fail "--since did not surface what arrived after the send"
+"$RUNNER" read "$run_dir" --since "$offset" --plain | grep -q 'REPL pronto' &&
+    fail "--since leaked output that predates the send"
+
+# An ended session is idle too, but the caller must be able to tell them apart.
+"$RUNNER" send "$run_dir" --text "sair" >/dev/null
+"$RUNNER" wait "$run_dir" --timeout 20 >/dev/null 2>&1
+idle="$("$RUNNER" wait-idle "$run_dir" --quiet-for 1 --timeout 20)"
+[ $? -eq 4 ] || fail "wait-idle did not distinguish a finished session"
+grep -qE '^state=(done|failed)$' <<<"$idle" || fail "wait-idle did not report the final state"
+
 # --- a closed window must record a result, never leave a stale `running` ---
 
 output="$(headless "$RUNNER" start \
