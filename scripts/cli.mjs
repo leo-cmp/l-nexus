@@ -23,6 +23,10 @@ const commands = new Map([
     executable: process.execPath,
     prefix: [path.join(scriptDirectory, 'migrate-task-routing.mjs')],
   }],
+  ['migrate-routing', {
+    executable: process.execPath,
+    prefix: [path.join(scriptDirectory, 'migrate-routing.mjs')],
+  }],
 ]);
 
 function usage() {
@@ -32,7 +36,8 @@ Commands:
   install [target]
   update [target]
   validate-task <task-path> [--routing <path>] [--final-commit <sha>]
-  migrate-task <task-path> [--to 1|2] [--write]`;
+  migrate-task <task-path> [--to 1|2] [--write]
+  migrate-routing <routing-path> [--write]`;
 }
 
 const [command, ...args] = process.argv.slice(2);

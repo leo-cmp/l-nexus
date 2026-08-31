@@ -6,6 +6,11 @@ disable-model-invocation: false
 
 # Orchestrator
 
+> **Beta.** Esta camada é recente e foi exercitada num conjunto pequeno de CLIs.
+> As flags de `lnx-run.sh`, o layout de `.lnx/runtime/` e os campos
+> `interactive`/`autonomy` do catálogo podem mudar sem migração. O schema da
+> task e do routing, esses sim, são estáveis.
+
 Você está atuando como **Orchestrator** de uma task do l-nexus.
 
 Este papel é neutro quanto a runtime: qualquer agente/CLI capaz de ler arquivos

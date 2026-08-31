@@ -26,6 +26,30 @@ npx @leo-cmp/l-nexus install
 
 ---
 
+## Estado da orquestração multi-LLM (beta)
+
+A camada de **orquestração** — role `orchestrator`, skill `lnx-orchestrator`,
+`lnx-run.sh`/`lnx-pty.py`, terminais visíveis e `--io broker` — é **beta na
+v1.0.0**. Ela funciona e tem cobertura de teste, mas foi exercitada num conjunto
+pequeno de CLIs e de ambientes. Se causar problema, pode ser removida ou
+redesenhada numa versão seguinte.
+
+O que **não** é beta e continua estável: complexidade/risco, catálogo de
+modelos, validação de roteamento, revisão independente, guarda de conteúdo
+protegido, install/update. Um projeto pode adotar a v1.0.0 e simplesmente não
+usar o orquestrador.
+
+O que pode mudar sem cerimônia enquanto estiver beta:
+
+- as flags de `lnx-run.sh` e o layout de `.lnx/runtime/`;
+- os campos `interactive`, `autonomy` e `terminal_runners` do catálogo;
+- os detalhes do modo `--io broker`.
+
+O que **não** vai mudar sem migração: o schema 2 da task e do
+`model-routing.yaml`, porque projetos guardam esses arquivos.
+
+---
+
 ## Instalação
 
 ```bash
@@ -41,6 +65,28 @@ Para atualizar o l-nexus para a versão mais recente em um projeto existente (re
 ```bash
 npx @leo-cmp/l-nexus update
 ```
+
+### Vindo de uma versão anterior à 1.0.0
+
+O `update` traz os templates de task no schema 2, mas **não toca** no seu
+`.ai/model-routing.yaml` — ele é do projeto. Enquanto o routing estiver no
+schema 1, uma task criada pelo template novo falha na validação com
+`requires routing schema_version 2`.
+
+Migre o routing uma vez (simule primeiro, depois aplique):
+
+```bash
+npx @leo-cmp/l-nexus migrate-routing .ai/model-routing.yaml
+npx @leo-cmp/l-nexus migrate-routing .ai/model-routing.yaml --write
+```
+
+A migração adiciona **apenas** o que o schema 2 exige, preserva todos os seus
+modelos, políticas e comentários, e imprime o que precisa de decisão humana —
+por exemplo, o piso do tester é herdado do executor (nunca mais fraco), e cabe
+a você baixá-lo se quiser um tester mais barato.
+
+Tasks já existentes no schema 1 continuam válidas e não precisam migrar. Para
+adotar os slots numa task antiga, use `migrate-task <task> --to 2 --write`.
 
 ---
 

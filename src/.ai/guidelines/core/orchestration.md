@@ -1,5 +1,10 @@
 # Diretriz de Orquestração (Orchestration)
 
+> **Beta.** Esta camada é recente e foi exercitada num conjunto pequeno de CLIs.
+> As flags de `lnx-run.sh`, o layout de `.lnx/runtime/` e os campos
+> `interactive`/`autonomy` do catálogo podem mudar sem migração. O schema da
+> task e do routing, esses sim, são estáveis.
+
 Esta diretriz define o contrato do papel **Orchestrator**: coordenar a execução
 de uma task já planejada, aplicando gates de teste, review, rework e upgrade,
 sem reduzir silenciosamente política de risco.
