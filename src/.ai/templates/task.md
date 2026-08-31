@@ -11,22 +11,92 @@ risk:
   level: "[R1 | R2 | R3]"
   domains: []
   rationale: "[impacto caso a implementacao esteja errada]"
+# Classificacao funcional. Alimenta a escolha de work_route em .ai/model-routing.yaml.
+# work_type sugerido: planning | implementation | bugfix | refactor | testing |
+#   review | system-design | documentation | migration | investigation
+routing:
+  work_type: "[work type]"
+  categories: []
+  technologies: []
+  required_capabilities: []
+# Contrato de roteamento resolvido pelo Planner e executado pelo Orchestrator.
+# default        preferencia normal
+# alt1 / alt2    alternativas LATERAIS (indisponibilidade, custo, rate limit,
+#                provedor, especializacao, preferencia humana) — nao sao retry
+# upgrade_alt*   escalada VERTICAL, so apos esgotar rework ou quando a tarefa se
+#                revelou materialmente maior
+# effort: default | low | high | max — resolve a elegibilidade via profile_by_variant
+# Os valores de `model` sao CHAVES do catalogo `models:` do model-routing.yaml.
 model_plan:
+  schema: 2
   created_by:
     agent: "[agente]"
     provider: "[provedor ou unknown]"
     model: "[modelo exato ou unknown]"
-  executor_profile: "[economical | balanced | frontier]"
-  suggested_models: []
-  reviewer_profile: "[economical | balanced | frontier]"
-  review_required: "[true | false]"
-  cross_provider_required: "[true | false]"
-model_execution:
   executor:
+    required_profile: "[economical | balanced | frontier]"
+    required_capabilities: []
+    default:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+    alt1:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+    alt2:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+    upgrade_alt1:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+    upgrade_alt2:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+  tester:
+    required: "[true | false]"
+    required_profile: "[economical | balanced | frontier]"
+    default:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+  reviewer:
+    required: "[true | false]"
+    required_profile: "[economical | balanced | frontier]"
+    independent_model: "[true | false]"
+    cross_provider_required: "[true | false]"
+    default:
+      model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+routing_rationale:
+  executor: "[por que este executor e este effort]"
+  tester: "[por que este tester, ou por que nao ha gate de teste]"
+  reviewer: "[por que este revisor e esta politica de independencia]"
+  upgrades: "[quando os upgrades sao permitidos]"
+# Subestado do workflow. `status` acima continua sendo o estado macro.
+orchestration:
+  mode: manual
+  state: pending
+  attempts:
+    executor: 0
+    reworks: 0
+    upgrades: 0
+# Proveniencia real. Preenchida durante a execucao, nunca antecipada.
+# `selection` registra qual slot foi de fato usado (default/alt1/alt2/upgrade_alt*).
+model_execution:
+  orchestrator:
     agent: ""
     provider: ""
     model: ""
+    effort: ""
     started_at: ""
+  executor:
+    selection: ""
+    agent: ""
+    provider: ""
+    model: ""
+    effort: ""
+    runner: ""
+    started_at: ""
+    attempts: 0
+  tests: []
   reviews: []
 issue: "[URL da issue GitHub]"
 ---

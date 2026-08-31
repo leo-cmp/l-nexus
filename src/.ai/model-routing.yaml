@@ -1,9 +1,18 @@
-schema_version: 1
+schema_version: 2
 
-# 🔒 [PROJETO] Roteamento de Modelos & Executores de CLI
+# 🔒 [PROJETO] Roteamento de Modelos, Executores de CLI e Terminais
 # Este arquivo pertence exclusivamente ao projeto local e NUNCA é sobrescrito pelo `npx update`.
+#
+# Camadas deliberadamente desacopladas:
+#   ROLE (planner/orchestrator/executor/tester/reviewer)
+#     -> MODEL ROUTING (default/alt1/alt2/upgrade_alt1/upgrade_alt2 + effort)
+#       -> CLI RUNNER (como aquele modelo é executado)
+#         -> TERMINAL RUNNER (como a execução fica visível)
+# Nenhum modelo, provedor, CLI ou terminal é decisão fixa de código: tudo o que
+# está abaixo é configuração do projeto e pode ser trocado sem alterar o l-nexus.
 project_policy:
   r2_review: optional
+  r2_test_gate: optional
   r3_cross_provider: true
   unknown_model_identity: reject_for_r3
 
@@ -256,47 +265,285 @@ risk_domains:
     - material-concurrency-idempotency
   project: []
 
+# Piso obrigatório por risco. `work_routes` escolhe modelos DENTRO deste piso e
+# nunca pode enfraquecê-lo: o validador confere os slots contra estas rotas.
 routes:
   R1:
     executor_profile: economical
     review: optional
+    test_gate: optional
     independent_model: false
   R2:
     executor_profile: balanced
     review: project_policy
+    test_gate: project_policy
+    tester_profile: balanced
     reviewer_profile: balanced
     independent_model: true
   R3:
     executor_profile: frontier
     review: required
+    test_gate: required
+    tester_profile: balanced
     reviewer_profile: frontier
     independent_model: true
     cross_provider: project_policy
 
-# Runners de CLI para delegação de comandos via terminal
+# Orçamento de tentativas. Torna o loop infinito impossível por contrato.
+execution_policy:
+  max_same_executor_reworks: 1
+  max_upgrades: 1
+  max_total_execution_attempts: 3
+
+# Recomendações de roteamento por tipo de trabalho. É a entrada declarativa do
+# Planner: ele escolhe aqui os slots concretos e os PERSISTE na task, que passa a
+# ser o contrato. Estas entradas são recomendações do projeto, nunca decisões
+# fixas de código — troque livremente os modelos abaixo.
+#
+# Slots:
+#   default                     preferência normal
+#   alt1 / alt2                 alternativas LATERAIS (indisponibilidade, custo,
+#                               rate limit, provedor, especialização, preferência
+#                               humana) — não são uma escada de retry
+#   upgrade_alt1 / upgrade_alt2 escalada VERTICAL, só depois de esgotar rework ou
+#                               quando a tarefa se revelou materialmente maior
+# Effort permitido: default | low | high | max
+work_routes:
+  backend-implementation:
+    executor:
+      default: { model: deepseek-v4-pro, effort: high }
+      alt1: { model: openai-gpt-5-6-terra, effort: high }
+      alt2: { model: anthropic-sonnet-5, effort: high }
+      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
+      upgrade_alt2: { model: anthropic-opus-5, effort: max }
+    tester:
+      default: { model: openai-gpt-5-6-luna, effort: high }
+      alt1: { model: google-gemini-3-7-flash, effort: high }
+    reviewer:
+      default: { model: anthropic-sonnet-5, effort: high }
+      alt1: { model: openai-gpt-5-6-terra, effort: high }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+
+  frontend-implementation:
+    executor:
+      default: { model: anthropic-sonnet-5, effort: high }
+      alt1: { model: openai-gpt-5-6-terra, effort: high }
+      alt2: { model: google-gemini-3-7-flash, effort: high }
+      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
+      upgrade_alt2: { model: anthropic-opus-5, effort: max }
+    tester:
+      default: { model: openai-gpt-5-6-luna, effort: high }
+      alt1: { model: anthropic-haiku-4-5, effort: high }
+    reviewer:
+      default: { model: openai-gpt-5-6-terra, effort: high }
+      alt1: { model: anthropic-sonnet-5, effort: high }
+      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
+
+  test-authoring:
+    executor:
+      default: { model: openai-gpt-5-6-luna, effort: high }
+      alt1: { model: xiaomi-mimo-v2-5, effort: high }
+      alt2: { model: google-gemini-3-7-flash, effort: high }
+      upgrade_alt1: { model: deepseek-v4-pro, effort: high }
+      upgrade_alt2: { model: anthropic-sonnet-5, effort: high }
+    reviewer:
+      default: { model: anthropic-sonnet-5, effort: high }
+      alt1: { model: openai-gpt-5-6-terra, effort: high }
+
+  sql-migration:
+    executor:
+      default: { model: deepseek-v4-pro, effort: high }
+      alt1: { model: anthropic-sonnet-5, effort: high }
+      alt2: { model: openai-gpt-5-6-terra, effort: high }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+    tester:
+      default: { model: openai-gpt-5-6-luna, effort: high }
+    reviewer:
+      default: { model: anthropic-opus-5, effort: high }
+      alt1: { model: openai-gpt-5-6-sol, effort: high }
+
+  bugfix:
+    executor:
+      default: { model: openai-gpt-5-6-terra, effort: high }
+      alt1: { model: deepseek-v4-pro, effort: high }
+      alt2: { model: anthropic-sonnet-5, effort: high }
+      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
+      upgrade_alt2: { model: anthropic-opus-5, effort: max }
+    tester:
+      default: { model: openai-gpt-5-6-luna, effort: high }
+    reviewer:
+      default: { model: anthropic-sonnet-5, effort: high }
+
+  refactor:
+    executor:
+      default: { model: anthropic-sonnet-5, effort: high }
+      alt1: { model: deepseek-v4-pro, effort: high }
+      alt2: { model: openai-gpt-5-6-terra, effort: high }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+    tester:
+      default: { model: openai-gpt-5-6-luna, effort: high }
+    reviewer:
+      default: { model: openai-gpt-5-6-terra, effort: high }
+
+  documentation:
+    executor:
+      default: { model: anthropic-haiku-4-5, effort: default }
+      alt1: { model: openai-gpt-5-6-luna, effort: default }
+      alt2: { model: google-gemini-3-7-flash, effort: default }
+      upgrade_alt1: { model: openai-gpt-5-6-terra, effort: high }
+      upgrade_alt2: { model: anthropic-sonnet-5, effort: high }
+
+  # Trabalho R3: executor frontier, revisor frontier de outro provedor.
+  critical-implementation:
+    executor:
+      default: { model: openai-gpt-5-6-sol, effort: max }
+      alt1: { model: anthropic-opus-5, effort: max }
+      alt2: { model: deepseek-v4-pro, effort: max }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+    tester:
+      default: { model: openai-gpt-5-6-terra, effort: high }
+      alt1: { model: deepseek-v4-pro, effort: high }
+    reviewer:
+      default: { model: anthropic-opus-5, effort: max }
+      alt1: { model: deepseek-v4-pro, effort: max }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+
+  # Trabalho de planejamento: analise de requisito, escrita/decomposicao de task,
+  # criterios de aceite, classificacao de risco e selecao de modelo.
+  planning:
+    executor:
+      default: { model: anthropic-sonnet-5, effort: high }
+      alt1: { model: openai-gpt-5-6-terra, effort: high }
+      alt2: { model: deepseek-v4-pro, effort: high }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+
+  system-design:
+    executor:
+      default: { model: anthropic-opus-5, effort: max }
+      alt1: { model: openai-gpt-5-6-sol, effort: max }
+      alt2: { model: anthropic-sonnet-5, effort: max }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+    reviewer:
+      default: { model: openai-gpt-5-6-sol, effort: max }
+      alt1: { model: deepseek-v4-pro, effort: max }
+
+# Runners de CLI para delegação de comandos via terminal.
+# `argv` é a forma preferida: cada elemento vira UM argumento, sem shell no meio,
+# portanto conteudo de task nunca pode virar comando. `command_template` continua
+# aceito para compatibilidade com o schema 1, mas é uma string de shell.
+#
+# Placeholders (substituídos elemento a elemento): {prompt} {model} {effort}
+# prompt_delivery: argv | file | stdin  (stdin/file são os mais seguros)
+# provides: quais modelos/provedores este runner sabe executar — é isto que
+#   desacopla modelo de CLI. Deixe vazio se o runner atende qualquer modelo.
+# effort.supported: declare `true` SOMENTE se a CLI realmente aplica o esforço.
+#   Declarar `true` sem suporte real quebra a garantia de identidade do R3.
 # Use /lnx-configurar-roteamento para reconfigurar interativamente.
 cli_runners:
+  # Interfaces verificadas contra os binarios instalados em 2026-08-31.
+  # Ao trocar de CLI ou de versao, confirme com `--help` antes de editar:
+  # um template errado trava a delegacao (modo interativo) ou credita um
+  # effort que a CLI nao aplica.
   codex:
     binary: "codex"
-    command_template: "codex exec --model {model} -p \"{prompt}\""
+    # `codex exec ... -` le as instrucoes do stdin.
+    argv: ["exec", "--model", "{model}", "-"]
+    prompt_delivery: stdin
     default_model: "gpt-5.6-sol"
+    provides:
+      providers: [openai]
+      models: []
+    effort:
+      # Nao verificado nesta versao da CLI. Deixe false ate confirmar.
+      supported: false
+      argv: []
+      mapping: {}
   claude:
     binary: "claude"
-    command_template: "claude -p \"{prompt}\" --model {model}"
+    argv: ["-p", "{prompt}", "--model", "{model}"]
+    prompt_delivery: argv
     default_model: "claude-sonnet-5"
+    provides:
+      providers: [anthropic]
+      models: []
+    effort:
+      # `--effort low|medium|high|xhigh|max`
+      supported: true
+      argv: ["--effort", "{effort}"]
+      mapping: { low: low, high: high, max: max }
   opencode:
     binary: "opencode"
-    command_template: "opencode --model {model} \"{prompt}\""
+    # O subcomando `run` e o modo nao interativo; sem ele a TUI abre e trava.
+    argv: ["run", "--model", "{model}", "{prompt}"]
+    prompt_delivery: argv
     default_model: "deepseek-v4-flash"
+    provides:
+      providers: []
+      models: []
+    effort:
+      supported: false
+      argv: []
+      mapping: {}
   agy:
     binary: "agy"
-    command_template: "agy --model {model} \"{prompt}\""
-    default_model: "gemini-3.7-flash"
+    # `--print` e obrigatorio: sem ele a sessao abre interativa e nao retorna.
+    argv: ["--model", "{model}", "--print", "{prompt}"]
+    prompt_delivery: argv
+    # Os ids desta CLI embutem o esforco no proprio nome do modelo
+    # (ex.: `<familia>-high` / `-medium` / `-low`). Consulte `agy models`.
+    default_model: "gemini-3.7-flash-high"
+    provides:
+      providers: [google]
+      models: []
+    effort:
+      # `--effort low|medium|high`. Nao existe `max`, entao `max` fica fora do
+      # mapping de proposito: creditar um esforco inexistente seria mentira.
+      supported: true
+      argv: ["--effort", "{effort}"]
+      mapping: { low: low, high: high }
   qwen:
     binary: "qwen"
-    command_template: "qwen --model {model} \"{prompt}\""
+    argv: ["--model", "{model}", "--prompt", "{prompt}"]
+    prompt_delivery: argv
     default_model: "qwen3.7-plus"
+    provides:
+      providers: [alibaba]
+      models: []
+    effort:
+      supported: false
+      argv: []
+      mapping: {}
   kimi:
     binary: "kimi"
-    command_template: "kimi --model {model} \"{prompt}\""
+    argv: ["--model", "{model}", "--prompt", "{prompt}"]
+    prompt_delivery: argv
     default_model: "kimi-k2-chat"
+    provides:
+      providers: []
+      models: []
+    effort:
+      supported: false
+      argv: []
+      mapping: {}
+
+# Adaptadores de terminal visível (Linux-first). `preference` é a ordem tentada
+# quando o Orchestrator pede `--terminal auto`. `tmux` só é elegível dentro de
+# uma sessão tmux. Se nada abrir, o l-nexus NÃO executa em background escondido:
+# ele bloqueia com o motivo ou roda inline no terminal atual (fallback).
+#
+# Para um emulador fora da lista, use `custom` com `argv` e os placeholders
+# {title} {cwd} {command} — o l-nexus repassa isso a `lnx-run.sh --terminal-cmd`.
+terminal_runners:
+  preference: [tmux, gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, tilix, terminator, x-terminal-emulator, xterm]
+  fallback: inline
+  hold: auto
+  hold_seconds: 30
+  adapters:
+    custom:
+      binary: ""
+      argv: []
