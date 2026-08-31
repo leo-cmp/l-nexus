@@ -103,6 +103,22 @@ def main():
     except ValueError:
         pass
 
+    def on_hangup(signum, _frame):
+        # Closing the window hangs up the terminal. Take the child down with us
+        # instead of leaving an agent running with nothing attached to it, and
+        # let the normal exit path record the verdict.
+        try:
+            os.kill(pid, signal.SIGHUP)
+        except OSError:
+            pass
+        raise SystemExit(128 + signum)
+
+    for received in (signal.SIGHUP, signal.SIGTERM, signal.SIGINT):
+        try:
+            signal.signal(received, on_hangup)
+        except (ValueError, OSError):
+            pass
+
     saved = None
     if stdin_is_tty:
         try:
@@ -164,7 +180,10 @@ def main():
         except OSError:
             pass
 
-    _, wait_status = os.waitpid(pid, 0)
+    try:
+        _, wait_status = os.waitpid(pid, 0)
+    except OSError:
+        wait_status = 0
     if os.WIFEXITED(wait_status):
         exit_code = os.WEXITSTATUS(wait_status)
     elif os.WIFSIGNALED(wait_status):
@@ -182,4 +201,14 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except SystemExit:
+        raise
+    except BaseException:
+        # Any unexpected failure still has to leave an honest result behind.
+        run = os.path.abspath(sys.argv[1]) if len(sys.argv) > 1 else None
+        if run and os.path.isdir(run):
+            write_atomic(os.path.join(run, "exit-code"), 1)
+            write_atomic(os.path.join(run, "status"), "failed")
+        raise

@@ -146,12 +146,15 @@ headless "$RUNNER" start --role executor --runner fake --runner-bin fake-agent \
 
 cat > "$BIN/fake-terminal" <<'TERMINAL'
 #!/usr/bin/env bash
-echo "TERMINAL_TITLE=$1"
+# The launcher backgrounds the emulator, so the adapter records what it received
+# to a file instead of stdout.
+printf '%s' "$1" > "$LNX_TEST_TITLE_FILE"
 shift 2
 exec "$@"
 TERMINAL
 chmod +x "$BIN/fake-terminal"
 
+export LNX_TEST_TITLE_FILE="$TMP_DIR/terminal-title.txt"
 output="$(headless "$RUNNER" start \
     --task TASK-6 --role reviewer --runner fake --runner-bin fake-agent \
     --cwd "$PROJECT" --terminal custom \
@@ -161,7 +164,7 @@ output="$(headless "$RUNNER" start \
 grep -q '^terminal=custom$' <<<"$output" || fail "the custom adapter was not selected"
 run_dir="$(sed -n 's/^run_dir=//p' <<<"$output")"
 [ "$(cat "$run_dir/status")" = done ] || fail "the custom adapter did not complete the run"
-grep -q 'TERMINAL_TITLE=TASK-6 reviewer' <<<"$output" || fail "the custom adapter did not receive {title}"
+grep -q 'TASK-6 reviewer' "$LNX_TEST_TITLE_FILE" || fail "the custom adapter did not receive {title}"
 grep -q 'ARGC=' "$run_dir/output.log" || fail "the custom adapter did not run the delegated command"
 
 output="$(headless env FAKE_AGENT_EXIT=9 "$RUNNER" start \
@@ -295,6 +298,74 @@ output="$(headless "$RUNNER" start \
     --cwd "$PROJECT" --fallback inline --io pipe --hold never 2>&1)"
 run_dir="$(sed -n 's/^run_dir=//p' <<<"$output")"
 "$RUNNER" send "$run_dir" --text "oi" 2>/dev/null && fail "send was accepted on a pipe run"
+
+# --- a closed window must record a result, never leave a stale `running` ---
+
+output="$(headless "$RUNNER" start \
+    --task TASK-ORPHAN --role executor --runner fake --runner-bin fake-repl \
+    --cwd "$PROJECT" --io broker --terminal custom \
+    --terminal-cmd fake-terminal-exec --terminal-cmd '{title}' --terminal-cmd '{cwd}' \
+    --terminal-cmd '{command}' --detach 2>&1)"
+[ $? -eq 0 ] || fail "the orphan scenario did not start: $output"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output")"
+deadline=$((SECONDS + 15))
+while [ "$(cat "$run_dir/status" 2>/dev/null)" != running ] && [ "$SECONDS" -lt "$deadline" ]; do :; done
+[ "$(cat "$run_dir/status")" = running ] || fail "the orphan scenario never started"
+
+# SIGKILL leaves no chance to run a trap: this is the window being destroyed.
+supervisor_pid="$(cat "$run_dir/supervisor.pid")"
+kill -9 "$supervisor_pid" 2>/dev/null
+deadline=$((SECONDS + 15))
+while kill -0 "$supervisor_pid" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do :; done
+
+[ "$(cat "$run_dir/status")" = running ] ||
+    fail "this case is meant to leave a stale file behind; the test proves the reader is honest"
+grep -q '^status=orphaned$' <<<"$("$RUNNER" status "$run_dir")" ||
+    fail "a dead supervisor was still reported as running"
+"$RUNNER" wait "$run_dir" --timeout 10 2>/dev/null &&
+    fail "wait reported success for an orphaned run"
+"$RUNNER" send "$run_dir" --text "oi" 2>/dev/null &&
+    fail "send was accepted on an orphaned session"
+
+# Closing the window hangs up the supervisor. That must record a verdict and
+# must not leave the delegated agent running with nothing attached to it.
+output="$(headless "$RUNNER" start \
+    --task TASK-HANGUP --role executor --runner fake --runner-bin fake-repl \
+    --cwd "$PROJECT" --io broker --terminal custom \
+    --terminal-cmd fake-terminal-exec --terminal-cmd '{title}' --terminal-cmd '{cwd}' \
+    --terminal-cmd '{command}' --detach 2>&1)"
+[ $? -eq 0 ] || fail "the hangup scenario did not start: $output"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output")"
+deadline=$((SECONDS + 15))
+while [ "$(cat "$run_dir/status" 2>/dev/null)" != running ] && [ "$SECONDS" -lt "$deadline" ]; do :; done
+[ "$(cat "$run_dir/status")" = running ] || fail "the hangup scenario never started"
+
+# Closing a window hangs up the whole foreground group, so the signal reaches the
+# PTY supervisor itself -- not just the shell that is blocked waiting on it.
+broker_pid="$(pgrep -P "$(cat "$run_dir/supervisor.pid")" | head -1)"
+[ -n "$broker_pid" ] || fail "could not find the PTY supervisor process"
+agent_pid="$(pgrep -P "$broker_pid" | head -1)"
+kill -HUP "$broker_pid" 2>/dev/null
+
+deadline=$((SECONDS + 20))
+while [ "$SECONDS" -lt "$deadline" ]; do
+    state="$(cat "$run_dir/status" 2>/dev/null)"
+    [ "$state" = running ] || [ "$state" = starting ] || break
+done
+state="$(cat "$run_dir/status")"
+[ "$state" = failed ] || fail "a hung-up session did not record a verdict (status=$state)"
+[ -n "$(cat "$run_dir/exit-code" 2>/dev/null)" ] || fail "a hung-up session recorded no exit code"
+
+if [ -n "$agent_pid" ]; then
+    deadline=$((SECONDS + 15))
+    while kill -0 "$agent_pid" 2>/dev/null && [ "$SECONDS" -lt "$deadline" ]; do :; done
+    kill -0 "$agent_pid" 2>/dev/null &&
+        fail "the delegated agent survived the hangup with no terminal attached"
+fi
+
+# --- the window is the human's; it does not close on its own ---------------
+
+[ "$(cat "$run_dir/hold")" = keep ] || fail "keep is not the default hold policy"
 
 # --- numeric options are validated, not silently coerced -------------------
 

@@ -39,7 +39,7 @@ Usage:
                    [--prompt-file FILE] [--prompt-delivery argv|file|stdin]
                    [--attempt N] [--cwd DIR] [--run-root DIR]
                    [--terminal auto|none|NAME] [--terminal-cmd ARG]...
-                   [--fallback block|inline] [--hold auto|always|never]
+                   [--fallback block|inline] [--hold keep|auto|always|never]
                    [--hold-seconds N] [--timeout SECONDS]
                    [--banner compact|full|none] [--detach]
                    [--io auto|broker|tty|pipe]
@@ -110,11 +110,7 @@ build_terminal_argv() {
     shift 3
     TERMINAL_ARGV=()
     case "$adapter" in
-        gnome-terminal)
-            TERMINAL_ARGV=(gnome-terminal --title "$title" --working-directory "$cwd")
-            [ "${LNX_TERMINAL_DETACHED:-false}" = true ] || TERMINAL_ARGV+=(--wait)
-            TERMINAL_ARGV+=(-- "$@")
-            ;;
+        gnome-terminal) TERMINAL_ARGV=(gnome-terminal --title "$title" --working-directory "$cwd" -- "$@") ;;
         konsole)        TERMINAL_ARGV=(konsole -p "tabtitle=$title" --workdir "$cwd" -e "$@") ;;
         xfce4-terminal) TERMINAL_ARGV=(xfce4-terminal --title "$title" --working-directory "$cwd" --disable-server -x "$@") ;;
         kitty)          TERMINAL_ARGV=(kitty --title "$title" --directory "$cwd" "$@") ;;
@@ -174,6 +170,24 @@ read_state() {
     [ -f "$1" ] && tr -d '\n' < "$1"
 }
 
+# A supervisor killed outright (SIGKILL, a crashed emulator) never runs its trap.
+# Reporting `running` in that case would be a lie, and anything polling the run
+# would wait forever, so a dead supervisor is surfaced as `orphaned`.
+effective_status() {
+    local run_dir="$1" state pid
+    state="$(read_state "$run_dir/status" || printf 'unknown')"
+    case "$state" in
+        starting|running) ;;
+        *) printf '%s' "$state"; return 0 ;;
+    esac
+    pid="$(read_state "$run_dir/supervisor.pid" || true)"
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+        printf 'orphaned'
+        return 0
+    fi
+    printf '%s' "$state"
+}
+
 # --- supervise -------------------------------------------------------------
 
 command_supervise() {
@@ -185,7 +199,7 @@ command_supervise() {
     local cwd delivery hold hold_seconds label banner io
     cwd="$(cat "$run_dir/cwd" 2>/dev/null || printf '%s' "$PWD")"
     delivery="$(read_state "$run_dir/prompt-delivery" || printf 'argv')"
-    hold="$(read_state "$run_dir/hold" || printf 'auto')"
+    hold="$(read_state "$run_dir/hold" || printf 'keep')"
     banner="$(read_state "$run_dir/banner" || printf 'compact')"
     io="$(read_state "$run_dir/io" || printf 'pipe')"
     hold_seconds="$(read_state "$run_dir/hold-seconds" || printf '30')"
@@ -195,6 +209,21 @@ command_supervise() {
     local argv=()
     mapfile -d '' -t argv < "$run_dir/command.argv"
     [ "${#argv[@]}" -gt 0 ] || die 'supervise: empty command' 2
+
+    printf '%s' "$$" > "$run_dir/supervisor.pid"
+    # Closing the window sends SIGHUP. Without this the run directory would keep
+    # claiming `running` forever and anything waiting on it would hang.
+    supervise_interrupted() {
+        local state
+        state="$(read_state "$run_dir/status" || printf 'unknown')"
+        case "$state" in
+            starting|running)
+                write_state "$run_dir/exit-code" 129
+                write_state "$run_dir/status" failed
+                ;;
+        esac
+    }
+    trap supervise_interrupted HUP INT TERM
 
     cd "$cwd" || die "supervise: cannot enter working directory: $cwd" 2
     # The broker publishes `running` itself, once the control channel exists and
@@ -234,7 +263,17 @@ command_supervise() {
         exit_code=${PIPESTATUS[0]}
     fi
 
-    if [ "$io" != broker ]; then
+    if [ "$io" = broker ]; then
+        # The broker records its own verdict. If it was killed before doing so,
+        # the run directory would keep claiming `running` forever, so the result
+        # is written here from whatever the supervisor exited with.
+        case "$(read_state "$run_dir/status" || printf 'unknown')" in
+            starting|running)
+                write_state "$run_dir/exit-code" "$exit_code"
+                write_state "$run_dir/status" failed
+                ;;
+        esac
+    else
         write_state "$run_dir/exit-code" "$exit_code"
         if [ "$exit_code" -eq 0 ]; then
             write_state "$run_dir/status" done
@@ -247,11 +286,24 @@ command_supervise() {
         printf '\n\033[2ml-nexus · %s · exit %s\033[0m\n' "$label" "$exit_code"
     fi
 
-    # Bounded so a held window can never block the orchestrator indefinitely.
-    if [ "$hold" = always ] || { [ "$hold" = auto ] && [ "$exit_code" -ne 0 ]; }; then
-        printf 'Window stays open for %ss (Enter closes it).\n' "$hold_seconds"
-        read -r -t "$hold_seconds" _ || true
-    fi
+    # The window belongs to the human. It never closes on its own unless the
+    # caller explicitly asked for that, and the result is already recorded above,
+    # so a window left open never blocks the orchestrator.
+    case "$hold" in
+        never) ;;
+        always|auto)
+            if [ "$hold" = always ] || [ "$exit_code" -ne 0 ]; then
+                printf 'Fechando em %ss (Enter fecha agora).\n' "$hold_seconds"
+                read -r -t "$hold_seconds" _ || true
+            fi
+            ;;
+        *)
+            if [ -t 0 ]; then
+                printf '\033[2mEnter ou feche a janela para encerrar.\033[0m\n'
+                read -r _ || true
+            fi
+            ;;
+    esac
     return "$exit_code"
 }
 
@@ -291,12 +343,17 @@ command_send() {
     [ -d "$run_dir" ] || die "send: run directory not found: $run_dir" 2
 
     local state io_mode
-    state="$(read_state "$run_dir/status" || printf 'unknown')"
+    state="$(effective_status "$run_dir")"
     io_mode="$(read_state "$run_dir/io" || printf 'unknown')"
     case "$state" in
         running) ;;
         *) die "send: the session is not running (status=$state)" 3 ;;
     esac
+    local pid
+    pid="$(read_state "$run_dir/supervisor.pid" || true)"
+    if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+        die "send: the supervisor is gone; the session is no longer reachable" 3
+    fi
     if [ "$io_mode" != broker ]; then
         die "send: this run uses io=$io_mode, which cannot accept input; start it with --io broker" 3
     fi
@@ -366,7 +423,7 @@ command_status() {
     local run_dir="${1:-}"
     [ -n "$run_dir" ] || die 'status: RUN_DIR is required' 2
     [ -d "$run_dir" ] || die "status: run directory not found: $run_dir" 2
-    printf 'status=%s\n' "$(read_state "$run_dir/status" || printf 'unknown')"
+    printf 'status=%s\n' "$(effective_status "$run_dir")"
     printf 'exit_code=%s\n' "$(read_state "$run_dir/exit-code" || printf 'unknown')"
     printf 'io=%s\n' "$(read_state "$run_dir/io" || printf 'unknown')"
     printf 'can_send=%s\n' "$([ -p "$run_dir/control.in" ] && printf 'true' || printf 'false')"
@@ -377,9 +434,12 @@ command_status() {
 wait_for_run() {
     local run_dir="$1" timeout="$2" waited=0 state recorded
     while :; do
-        state="$(read_state "$run_dir/status" || printf 'unknown')"
+        state="$(effective_status "$run_dir")"
         case "$state" in
             done) return 0 ;;
+            orphaned)
+                die "wait: the supervisor died without recording a result; the window was probably closed ($run_dir)" 4
+                ;;
             failed)
                 # Terminal emulators do not propagate exit codes portably, so the
                 # recorded code is replayed here to make both paths behave alike.
@@ -444,7 +504,7 @@ command_start() {
     local task='' role='' slot='' model='' effort='' runner='' runner_bin=''
     local prompt_file='' delivery=argv attempt=1 cwd="$PWD" run_root=''
     local requested_terminal=auto preference="$DEFAULT_TERMINAL_PREFERENCE"
-    local fallback=block hold=auto hold_seconds=30 timeout=0
+    local fallback=block hold=keep hold_seconds=30 timeout=0
     local banner=compact detach=false io=auto
     local runner_args=()
     TERMINAL_CMD=()
@@ -484,7 +544,7 @@ command_start() {
     [ -n "$runner_bin" ] || die 'start: --runner-bin is required' 2
     case "$delivery" in argv|file|stdin) ;; *) die "start: --prompt-delivery must be argv, file or stdin" 2 ;; esac
     case "$fallback" in block|inline) ;; *) die 'start: --fallback must be block or inline' 2 ;; esac
-    case "$hold" in auto|always|never) ;; *) die 'start: --hold must be auto, always or never' 2 ;; esac
+    case "$hold" in keep|auto|always|never) ;; *) die 'start: --hold must be keep, auto, always or never' 2 ;; esac
     case "$banner" in compact|full|none) ;; *) die 'start: --banner must be compact, full or none' 2 ;; esac
     case "$io" in auto|broker|tty|pipe) ;; *) die 'start: --io must be auto, broker, tty or pipe' 2 ;; esac
     if [ "$io" = broker ] || [ "$io" = tty ]; then
@@ -609,20 +669,19 @@ META
         return $?
     fi
 
-    export LNX_TERMINAL_DETACHED="$detach"
     if ! build_terminal_argv "$adapter" "$label" "$cwd" "${BASH:-bash}" "$SCRIPT_PATH" supervise "$run_dir"; then
         write_state "$run_dir/status" blocked
         die "unsupported terminal adapter: $adapter"
     fi
+    # The emulator is always launched in the background. The agent stays fully
+    # visible in its own window -- nothing is hidden -- but the window's lifetime
+    # is the human's business, while completion is decided by the run directory.
+    # That is what lets a window stay open without ever blocking a gate.
+    ("${TERMINAL_ARGV[@]}" >/dev/null 2>&1 &)
     if [ "$detach" = true ]; then
-        # The agent is fully visible in its own window and the human drives it.
-        # Only the launcher's wait is released, so nothing is ever hidden. This
-        # is refused for inline/none precisely because that WOULD hide it.
-        ("${TERMINAL_ARGV[@]}" >/dev/null 2>&1 &)
         printf 'detached=true\n'
         return 0
     fi
-    "${TERMINAL_ARGV[@]}" || true
     wait_for_run "$run_dir" "$timeout"
 }
 
