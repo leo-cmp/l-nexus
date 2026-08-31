@@ -257,3 +257,20 @@ test('the orchestrator skill and role name no runtime as the default', () => {
     assert.equal(claimsDefault.test(contents), false, `${relative} presents a runtime as the architectural default`);
   }
 });
+
+test('the update skill quotes the error the validator really emits', () => {
+  // The skill teaches an agent to recognise a stale routing by its exact
+  // symptom. If the validator's wording drifts, that instruction silently stops
+  // matching reality and the agent misses the migration.
+  const skill = readFileSync(
+    path.join(rootDirectory, 'src/.agents/skills/lnx-nexus-atualizar/SKILL.md'), 'utf8');
+  const validator = readFileSync(path.join(rootDirectory, 'scripts/validate-task-routing.mjs'), 'utf8');
+
+  const quoted = skill.match(/task\.model_plan\.schema: ([^\n]+)/);
+  assert.ok(quoted, 'the skill must quote the symptom of a stale routing');
+  assert.ok(validator.includes(quoted[1].trim()),
+    `the skill quotes "${quoted[1].trim()}", which the validator no longer emits`);
+
+  // And it must point at the command that actually fixes it.
+  assert.match(skill, /migrate-routing[^\n]*--write/);
+});
