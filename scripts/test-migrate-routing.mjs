@@ -126,3 +126,16 @@ test('is reachable from the CLI and is a dry run by default', () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('changes only what it needs to, so the dry run stays reviewable', () => {
+  const migrated = migrateRoutingContents(v1Routing).contents;
+  const before = v1Routing.split('\n');
+  const after = migrated.split('\n');
+  const removed = before.filter((line) => !after.includes(line) && line.trim() !== '');
+
+  // Every line that disappears must be one the migration deliberately rewrote.
+  const expected = [/^schema_version: 1$/];
+  const unexplained = removed.filter((line) => !expected.some((pattern) => pattern.test(line)));
+  assert.deepEqual(unexplained, [],
+    `a migracao reescreveu linhas que nao precisava:\n${unexplained.join('\n')}`);
+});

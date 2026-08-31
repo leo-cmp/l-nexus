@@ -96,7 +96,11 @@ export function migrateRoutingContents(contents, source = '<routing>') {
     notes.push('cli_runners: os campos argv, interactive, autonomy e effort nao foram adicionados porque dependem da CLI instalada; confirme com --help antes de declarar');
   }
 
-  return { changed: true, contents: document.toString({ lineWidth: 0 }), notes };
+  // Without this the serializer rewrites every `[a, b]` as `[ a, b ]`, burying
+  // the handful of real changes under cosmetic churn -- which defeats the whole
+  // point of the dry run being reviewable.
+  const migrated = document.toString({ lineWidth: 0, flowCollectionPadding: false });
+  return { changed: true, contents: migrated, notes };
 }
 
 function main() {
