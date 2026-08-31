@@ -35,14 +35,66 @@ setup_release_repo() {
 run_release() {
   local repo_dir="$1"
   local log_file="$2"
+  shift 2
 
   (
     cd "$repo_dir"
-    "$ROOT_DIR/scripts/release.sh" > "$log_file" 2>&1
+    "$ROOT_DIR/scripts/release.sh" "$@" > "$log_file" 2>&1
   ) || {
     cat "$log_file" >&2
     return 1
   }
+}
+
+test_bump_override_downgrades_a_breaking_change() {
+  local repo_dir="$TMP_DIR/repo-override"
+  local origin_dir="$TMP_DIR/origin-override.git"
+
+  setup_release_repo "$repo_dir" "$origin_dir"
+
+  printf "quebra\n" > "$repo_dir/README.md"
+  git -C "$repo_dir" add README.md
+  git -C "$repo_dir" commit -m "feat: muda o schema
+
+BREAKING CHANGE: projetos precisam migrar." >/dev/null
+
+  # Em 0.x, bumpar o minor JA e a sinalizacao de ruptura, entao o humano tem de
+  # poder publicar um BREAKING CHANGE como minor de proposito.
+  run_release "$repo_dir" "$TMP_DIR/release-override.log" --bump minor
+
+  local version
+  version="$(cat "$repo_dir/VERSION")"
+  [ "$version" = "0.3.0" ] || fail "override esperava 0.3.0, recebeu $version"
+  grep -q "Sobrescrito por --bump" "$TMP_DIR/release-override.log" ||
+    fail "o release nao informou que o bump foi sobrescrito"
+}
+
+test_bump_override_rejects_garbage() {
+  local repo_dir="$TMP_DIR/repo-badbump"
+  local origin_dir="$TMP_DIR/origin-badbump.git"
+
+  setup_release_repo "$repo_dir" "$origin_dir"
+
+  if run_release "$repo_dir" "$TMP_DIR/release-badbump.log" --bump enorme 2>/dev/null; then
+    fail "--bump aceitou um valor invalido"
+  fi
+}
+
+test_bump_override_does_not_invent_a_release() {
+  local repo_dir="$TMP_DIR/repo-nothing"
+  local origin_dir="$TMP_DIR/origin-nothing.git"
+
+  setup_release_repo "$repo_dir" "$origin_dir"
+
+  printf "nada releasable\n" > "$repo_dir/NOTES.md"
+  git -C "$repo_dir" add NOTES.md
+  git -C "$repo_dir" commit -m "chore: anota algo" >/dev/null
+
+  run_release "$repo_dir" "$TMP_DIR/release-nothing.log" --bump major
+
+  local version
+  version="$(cat "$repo_dir/VERSION")"
+  [ "$version" = "0.2.0" ] || fail "--bump criou release sem commit releasable (versao $version)"
 }
 
 test_docs_guideline_change_releases_patch() {
@@ -131,6 +183,9 @@ test_docs_outside_distributed_paths_does_not_release() {
 }
 
 test_docs_guideline_change_releases_patch
+test_bump_override_downgrades_a_breaking_change
+test_bump_override_rejects_garbage
+test_bump_override_does_not_invent_a_release
 test_docs_skill_change_releases_patch
 test_docs_model_routing_change_releases_patch
 test_docs_outside_distributed_paths_does_not_release

@@ -22,18 +22,60 @@ Configure os modelos disponíveis em `.ai/model-routing.yaml`:
 
 ```yaml
 models:
-  provider-model-version:
+  provider-model-version:          # esta chave e o identificador usado nas tasks
     provider: provider
-    profile: balanced
+    model: "id-de-api"             # id exposto pelo provedor (informativo)
+    profile: balanced              # perfil no esforco padrao
+    profile_by_variant:            # perfil efetivo por esforco
+      default: balanced
+      low: economical
+      high: frontier
+      max: frontier
     status: active
     capabilities: [backend, tests]
     last_evaluated: 2026-08-16
     evidence: "resultado da avaliação local"
 ```
 
+As tasks referenciam a **chave do catálogo** (`provider-model-version`), não o
+`model:` de API. Isso mantém uma única fonte de verdade para provedor, perfil e
+capacidades.
+
 Use identificadores versionados quando o provedor os oferecer. Alias móvel pode
 ser registrado, mas a evidência precisa informar qual versão foi efetivamente
 avaliada.
+
+## Esforço e Perfil Efetivo
+
+`modelo + esforço` é a unidade real de execução: o mesmo modelo em `low` e em
+`max` não entrega a mesma capacidade. Esforços permitidos: `default`, `low`,
+`high`, `max`.
+
+Com `schema_version: 2`, a elegibilidade é resolvida por
+`profile_by_variant[effort]`, não pelo campo `profile` plano. Se a task exige
+`balanced` e o modelo declara `low: economical` e `high: balanced`, então
+`{model: X, effort: low}` é rejeitado e `{model: X, effort: high}` é aceito.
+
+Uma CLI que não sabe aplicar esforço não recebe crédito por ele. Declare
+`effort.supported: true` em `cli_runners` **apenas** quando a CLI realmente
+aplicar. Quando o esforço é o que torna o modelo elegível para o perfil exigido,
+um runner sem suporte é rejeitado — em vez de fingir que o esforço foi aplicado.
+
+## Slots de Roteamento
+
+Cada papel roteado guarda até cinco opções, cada uma com o seu esforço:
+
+| Slot | Significado |
+|---|---|
+| `default` | preferência normal |
+| `alt1`, `alt2` | alternativas **laterais**: indisponibilidade, rate limit, custo, provedor, especialização, preferência humana. Não são retry do default |
+| `upgrade_alt1`, `upgrade_alt2` | escalada **vertical**: só depois de esgotar o rework ou quando a tarefa se revelar materialmente maior |
+
+Um upgrade nunca pode resolver para um perfil mais fraco que o `default`.
+
+As recomendações do projeto por tipo de trabalho vivem em `work_routes`. Elas
+selecionam modelos **dentro** do piso definido por `routes`, e nunca podem
+enfraquecê-lo: o validador confere os slots contra a rota do risco.
 
 ## Capacidades
 
@@ -79,6 +121,22 @@ do perfil registrado.
 Registre o modelo exato exposto pelo runtime. Quando essa informação não estiver
 disponível, use `unknown`; nunca deduza o modelo pelo nome da CLI ou do agente.
 Por padrão, identidade `unknown` não pode executar nem aprovar R3.
+
+## Gate de Teste
+
+Tester e Reviewer são papéis distintos e nenhum deles corrige código:
+
+- **Tester**: build passa? lint passa? testes passam? critérios verificáveis
+  passam? há regressão observável?
+- **Reviewer**: a solução está correta? há falha arquitetural, risco, edge case,
+  duplicação, problema de manutenibilidade ou vulnerabilidade?
+
+- R1: gate de teste opcional.
+- R2: `project_policy.r2_test_gate` define `required` ou `optional`.
+- R3: gate de teste obrigatório.
+
+Quando o gate é obrigatório, a task só conclui com uma execução `passed` sobre o
+commit final.
 
 ## Independência da Revisão
 

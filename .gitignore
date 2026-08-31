@@ -2,3 +2,6 @@
 .obsidian/
 nudge.db*
 node_modules/
+
+# l-nexus runtime (estado transitorio de execucao)
+.lnx/

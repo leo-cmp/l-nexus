@@ -29,6 +29,7 @@ echo "Target: $TARGET"
 SRC_DIR="$ROOT_DIR/src"
 
 LNX_STUB_VERSION=1
+LNX_ENTRYPOINT_MARKER='<!-- lnx-entrypoint v1 -->'
 
 physical_path_allow_missing() {
     node - "$1" <<'NODE'
@@ -343,6 +344,24 @@ EOF
     return 1
 }
 
+install_managed_entrypoint() {
+    local target_root="$1" name="$2" source="$3"
+    local path="$target_root/$name"
+
+    if [ -L "$path" ]; then
+        echo "  ! $name ja existe como symlink do projeto e nao foi alterado: $path"
+        echo "    Para ativar o fluxo do l-nexus, aponte-o para AGENTS.md ou copie src/$name."
+        return 0
+    fi
+    if [ -e "$path" ] && [ "$(head -1 "$path" 2>/dev/null || true)" != "$LNX_ENTRYPOINT_MARKER" ]; then
+        echo "  ! $name ja existe e pertence ao projeto: nao foi alterado."
+        echo "    Para ativar o fluxo do orquestrador, acrescente a ele:"
+        echo "      Leia AGENTS.md. Ao atuar como Orchestrator, use .agents/skills/lnx-orchestrator/SKILL.md."
+        return 0
+    fi
+    cp "$source" "$path"
+}
+
 mkdir -p "$TARGET/.ai/guidelines/domain/business-rules"
 mkdir -p "$TARGET/.ai/decisions"
 mkdir -p "$TARGET/.claude"
@@ -353,6 +372,10 @@ TARGET="$TARGET_ROOT"
 # AGENTS.md e CLAUDE.md
 cp "$SRC_DIR/AGENTS.md" "$TARGET/AGENTS.md"
 cp "$SRC_DIR/AGENTS.md" "$TARGET/CLAUDE.md"
+
+# GEMINI.md e gerenciado pelo l-nexus somente enquanto carregar o marcador.
+# Um arquivo escrito pelo projeto e preservado, com aviso.
+install_managed_entrypoint "$TARGET" GEMINI.md "$SRC_DIR/GEMINI.md"
 
 # Limpar symlinks obsoletos
 for f in CODEX.md COPILOT.md ANTIGRAVITY.md; do
@@ -370,6 +393,24 @@ rm -rf "$TARGET/.ai/guidelines/stacks"
 cp -r "$SRC_DIR/.ai/guidelines/stacks" "$TARGET/.ai/guidelines/stacks"
 
 # Domain (regras de negocio pertencem exclusivamente ao projeto)
+install_managed_entrypoint() {
+    local target_root="$1" name="$2" source="$3"
+    local path="$target_root/$name"
+
+    if [ -L "$path" ]; then
+        echo "  ! $name ja existe como symlink do projeto e nao foi alterado: $path"
+        echo "    Para ativar o fluxo do l-nexus, aponte-o para AGENTS.md ou copie src/$name."
+        return 0
+    fi
+    if [ -e "$path" ] && [ "$(head -1 "$path" 2>/dev/null || true)" != "$LNX_ENTRYPOINT_MARKER" ]; then
+        echo "  ! $name ja existe e pertence ao projeto: nao foi alterado."
+        echo "    Para ativar o fluxo do orquestrador, acrescente a ele:"
+        echo "      Leia AGENTS.md. Ao atuar como Orchestrator, use .agents/skills/lnx-orchestrator/SKILL.md."
+        return 0
+    fi
+    cp "$source" "$path"
+}
+
 mkdir -p "$TARGET/.ai/guidelines/domain/business-rules"
 if [ ! -f "$TARGET/.ai/guidelines/domain/business-rules/index.md" ]; then
     cp -r "$SRC_DIR/.ai/guidelines/domain/." "$TARGET/.ai/guidelines/domain/"
@@ -450,6 +491,13 @@ if [ -f "$TARGET/.gitignore" ]; then
     fi
 fi
 
+# `.lnx/` guarda prompts, logs e exit codes de execucoes delegadas. E gerado
+# pelo l-nexus, entao a entrada e garantida mesmo sem .gitignore previo: caso
+# contrario um `git add -A` levaria prompts e logs para o historico.
+if [ ! -e "$TARGET/.gitignore" ] || ! grep -Fqx ".lnx/" "$TARGET/.gitignore"; then
+    printf "\n# l-nexus runtime (estado transitorio de execucao)\n.lnx/\n" >> "$TARGET/.gitignore"
+fi
+
 if ! protected_paths="$("$SRC_DIR/.agents/hooks/lnx-guard.sh" --list-protected)"; then
     echo "ERRO: nao foi possivel obter a lista canonica de caminhos protegidos." >&2
     exit 1
@@ -472,6 +520,8 @@ echo "  ✓ .ai/roles/"
 echo "  ✓ .ai/guidelines/core/ & stacks/"
 echo "  ✓ .ai/templates/ & subagents/"
 echo "  ✓ .agents/skills/"
+echo "  ✓ .agents/scripts/ (lnx-run.sh — delegacao em terminal visivel)"
+echo "  ✓ AGENTS.md, CLAUDE.md, GEMINI.md"
 echo "  ✓ .mcp.json"
 echo ""
 echo "Proximo passo:"

@@ -12,6 +12,7 @@
     "scripts/update.sh",
     "scripts/validate-task-routing.mjs",
     "scripts/migrate-task-routing.mjs",
+    "scripts/migrate-routing.mjs",
     "MODEL_REQUIREMENTS.md",
     "VERSION"
   ],

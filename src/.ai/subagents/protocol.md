@@ -13,6 +13,9 @@ Este documento estabelece as diretrizes de governança, isolamento e comunicaç�
    - Lista de arquivos criados ou modificados.
    - Log de evidências de testes/comandos executados.
    - Resumo das decisões tomadas.
+   Quando a delegação vier do Orchestrator, escreva também `result.yaml` no run
+   dir informado. O run dir é o contrato mecânico da execução; a janela do
+   terminal é apenas o que o humano acompanha.
 4. **Agregação na Task Pai:** O agente pai é o único responsável por atualizar o plano `.planning/` e consolidar as evidências no `Log de Evidências` da task principal.
 
 ---
@@ -25,6 +28,11 @@ Este documento estabelece as diretrizes de governança, isolamento e comunicaç�
 | **Coder** | `.ai/subagents/coder.md` | Escrita no Workspace | Implementação de código e testes em escopo fechado. |
 | **Reviewer** | `.ai/subagents/reviewer.md` | Somente Leitura | Revisão independente de conformidade (R2/R3), segurança e regras. |
 | **QA / Tester** | `.ai/subagents/qa-tester.md` | Execução de Comandos | Execução de suíte de testes, cobertura e validação de regressão. |
+
+Reviewer e QA/Tester **verificam**; nenhum dos dois corrige código. Um achado
+volta ao Executor responsável através do agente pai. Para a coordenação completa
+(gates, rework, upgrade e terminais visíveis), veja
+`.ai/guidelines/core/orchestration.md`.
 
 ---
 
