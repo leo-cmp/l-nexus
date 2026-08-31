@@ -260,6 +260,12 @@ No rework, se a sessão do executor ainda está viva, o Orchestrator manda a
 correção **para ela** — o contexto é preservado e não nasce uma janela por
 tentativa.
 
+A janela **nunca fecha sozinha** (`--hold keep` é o padrão); fechar
+automaticamente é opt-in. Isso não atrasa gate nenhum, porque o `start` decide
+pelo arquivo de estado e não pela vida da janela. Ao fechar, o supervisor
+derruba o agente junto e grava o resultado; se ele for morto sem gravar,
+`status` responde `orphaned` em vez de mentir `running`.
+
 A janela é experiência de uso; o **contrato é o diretório de execução**:
 
 ```text

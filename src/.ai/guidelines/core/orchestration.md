@@ -240,6 +240,24 @@ quando a anterior morreu, quando o slot mudou (upgrade) ou quando o contexto
 precisa ser limpo de propósito. Registre a tentativa em
 `orchestration.attempts` de qualquer forma.
 
+### A janela pertence ao humano
+
+Uma janela de agente **nunca fecha sozinha**. O padrão é `--hold keep`: ela fica
+aberta até você fechar. Feche automaticamente só quando isso for pedido de
+propósito (`--hold auto` fecha no sucesso, `--hold never` fecha sempre, `always`
+fecha após um tempo).
+
+Isso não atrasa nenhum gate. O emulador sempre sobe em segundo plano e o
+`start` decide pelo arquivo de estado, não pela vida da janela — então uma
+janela deixada aberta jamais bloqueia o Orchestrator. Só a execução `inline`
+roda em primeiro plano, porque ali a janela é o seu próprio terminal.
+
+Fechar a janela desliga a sessão de forma limpa: o supervisor derruba o agente
+junto (em vez de deixar um agente rodando sem terminal nenhum) e grava
+`exit-code` e `status`. E se o supervisor for morto sem chance de gravar nada,
+`status` responde `orphaned` em vez de repetir `running` para sempre — um
+Orchestrator esperando ali seria travado por uma mentira.
+
 ### O terminal é UX; o run dir é o contrato
 
 Emuladores de terminal não propagam exit code de forma portável. O estado real
@@ -251,7 +269,8 @@ vem do diretório de execução:
   prompt.txt   prompt exato entregue ao agente
   command.txt  argv efetivamente executado (legível)
   output.log   stdout+stderr combinados, iguais ao que a janela mostrou
-  control.in   FIFO de controle: por onde o Orchestrator envia instrucoes
+  control.in     FIFO de controle: por onde o Orchestrator envia instrucoes
+  supervisor.pid PID do supervisor, para detectar sessao morta sem veredito
   status       starting | running | done | failed | blocked
   exit-code    exit code real da CLI delegada
   result.yaml  auto-relato estruturado que o agente delegado deve escrever
