@@ -192,6 +192,40 @@ test('E2E 13 — retry budgets from the shipped policy make an endless loop impo
   assert.match(result.stderr, /attempts\.upgrades: must not exceed execution_policy\.max_upgrades \(1\)/);
 });
 
+test('every runner declares interactive and autonomy support explicitly', () => {
+  // A flag that does not exist makes the delegation fail at launch, and a
+  // missing declaration invites guessing. Both must be stated, never implied.
+  const routing = readFileSync(shippedRouting, 'utf8');
+  const runners = routing.slice(routing.indexOf('\ncli_runners:'), routing.indexOf('\n# Adaptadores'));
+  const names = [...runners.matchAll(/^  ([a-z0-9-]+):$/gm)].map((match) => match[1]);
+  assert.ok(names.length > 0, 'no cli_runners parsed');
+
+  const problems = [];
+  for (const name of names) {
+    const start = runners.indexOf(`\n  ${name}:\n`);
+    const rest = runners.slice(start + 1);
+    const nextIndex = names
+      .map((other) => rest.indexOf(`\n  ${other}:\n`))
+      .filter((index) => index > 0)
+      .sort((a, b) => a - b)[0];
+    const block = nextIndex === undefined ? rest : rest.slice(0, nextIndex);
+    for (const section of ['interactive', 'autonomy', 'effort']) {
+      if (!new RegExp(`^    ${section}:$`, 'm').test(block)) {
+        problems.push(`${name} does not declare ${section}`);
+        continue;
+      }
+      const declared = block.slice(block.indexOf(`    ${section}:`));
+      const supported = declared.match(/^      supported: (true|false)$/m);
+      if (!supported) problems.push(`${name}.${section} does not state supported`);
+      // Claiming support with no argv would be a promise the runner cannot keep.
+      else if (supported[1] === 'true' && !/^      argv: \[".+/m.test(declared)) {
+        problems.push(`${name}.${section} claims support but declares no argv`);
+      }
+    }
+  }
+  assert.deepEqual(problems, [], problems.join('\n'));
+});
+
 test('the implementation never hardcodes a model, provider or CLI name', () => {
   // The whole point of the routing layer is that these names live in
   // project-owned configuration. If one leaks into a decision path, the

@@ -125,6 +125,17 @@ Regras:
   `comando &`, `nohup`, ou execução escondida para um agente principal;
 - anuncie no seu terminal: `Executor iniciado no terminal <adaptador> — <modelo> <effort> via <runner> (slot <slot>, tentativa <n>)`.
 
+Escolha entre `cli_runners.<nome>.argv` (uma tacada só, para gate automático) e
+`interactive.argv` (sessão que continua aberta, para você conduzir por `send`).
+Se `interactive.supported` for `false`, use o modo de uma tacada só — não tente
+abrir a TUI e colar depois.
+
+Se o humano pedir auto-aprovação, acrescente `autonomy.argv` **por invocação**,
+nunca por padrão. Ela desliga a confirmação de ferramenta da própria CLI, então
+a regra de confirmar comando destrutivo passa a depender inteiramente de você.
+Não use em R3. Se `autonomy.supported` for `false`, diga que aquela CLI não tem
+equivalente em vez de inventar uma flag.
+
 Modos de IO (`--io`):
 
 - `broker` (padrão): PTY real **e** canal de entrada. É o único em que você

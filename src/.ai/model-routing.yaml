@@ -445,15 +445,29 @@ work_routes:
 #   Declarar `true` sem suporte real quebra a garantia de identidade do R3.
 # Use /lnx-configurar-roteamento para reconfigurar interativamente.
 cli_runners:
-  # Interfaces verificadas contra os binarios instalados em 2026-08-31.
-  # Ao trocar de CLI ou de versao, confirme com `--help` antes de editar:
-  # um template errado trava a delegacao (modo interativo) ou credita um
-  # effort que a CLI nao aplica.
+  # Interfaces verificadas contra os binarios instalados em 2026-08-31 com
+  # `--help`. Ao trocar de CLI ou de versao, confirme antes de editar: um
+  # template errado trava a delegacao (modo interativo que nao retorna) ou
+  # credita um effort que a CLI nao aplica.
+  #
+  # argv         modo nao interativo, uma tacada so (gate automatico)
+  # interactive  sessao que continua aberta, para o Orchestrator conduzir
+  # autonomy     auto-aprovacao de ferramentas. NUNCA entra no argv padrao:
+  #              e opt-in por invocacao, porque desliga a confirmacao da
+  #              propria CLI e contraria a regra do l-nexus de que comando
+  #              destrutivo exige confirmacao humana. Evite em R3.
   codex:
     binary: "codex"
     # `codex exec ... -` le as instrucoes do stdin.
     argv: ["exec", "--model", "{model}", "-"]
     prompt_delivery: stdin
+    interactive:
+      # Sem subcomando as opcoes vao para a CLI interativa; PROMPT e posicional.
+      supported: true
+      argv: ["--model", "{model}", "{prompt}"]
+    autonomy:
+      supported: true
+      argv: ["--dangerously-bypass-approvals-and-sandbox"]
     default_model: "gpt-5.6-sol"
     provides:
       providers: [openai]
@@ -467,6 +481,13 @@ cli_runners:
     binary: "claude"
     argv: ["-p", "{prompt}", "--model", "{model}"]
     prompt_delivery: argv
+    interactive:
+      # Interativo por padrao; PROMPT e posicional.
+      supported: true
+      argv: ["--model", "{model}", "{prompt}"]
+    autonomy:
+      supported: true
+      argv: ["--dangerously-skip-permissions"]
     default_model: "claude-sonnet-5"
     provides:
       providers: [anthropic]
@@ -481,19 +502,37 @@ cli_runners:
     # O subcomando `run` e o modo nao interativo; sem ele a TUI abre e trava.
     argv: ["run", "--model", "{model}", "{prompt}"]
     prompt_delivery: argv
+    interactive:
+      # A TUI abre sem aceitar prompt inicial, entao nao da para conduzir por
+      # send a partir da abertura. Use o modo `run`.
+      supported: false
+      argv: []
+    autonomy:
+      supported: true
+      argv: ["--auto"]
     default_model: "deepseek-v4-flash"
     provides:
       providers: []
       models: []
     effort:
-      supported: false
-      argv: []
-      mapping: {}
+      # `--variant` recebe a variante de raciocinio do provedor. O help cita
+      # high, max e minimal; `low` fica fora do mapping porque nao ha
+      # equivalente nomeado e adivinhar seria creditar esforco que nao existe.
+      supported: true
+      argv: ["--variant", "{effort}"]
+      mapping: { high: high, max: max }
   agy:
     binary: "agy"
     # `--print` e obrigatorio: sem ele a sessao abre interativa e nao retorna.
     argv: ["--model", "{model}", "--print", "{prompt}"]
     prompt_delivery: argv
+    interactive:
+      # `-i` executa o prompt inicial e mantem a sessao aberta.
+      supported: true
+      argv: ["--model", "{model}", "-i", "{prompt}"]
+    autonomy:
+      supported: true
+      argv: ["--dangerously-skip-permissions"]
     # Os ids desta CLI embutem o esforco no proprio nome do modelo
     # (ex.: `<familia>-high` / `-medium` / `-low`). Consulte `agy models`.
     default_model: "gemini-3.7-flash-high"
@@ -510,6 +549,15 @@ cli_runners:
     binary: "qwen"
     argv: ["--model", "{model}", "--prompt", "{prompt}"]
     prompt_delivery: argv
+    interactive:
+      # `-i, --prompt-interactive`
+      supported: true
+      argv: ["--model", "{model}", "-i", "{prompt}"]
+    autonomy:
+      # Esta versao nao expoe nenhuma flag de aprovacao automatica. Declarar
+      # uma inexistente faria a delegacao falhar na abertura.
+      supported: false
+      argv: []
     default_model: "qwen3.7-plus"
     provides:
       providers: [alibaba]
@@ -522,6 +570,13 @@ cli_runners:
     binary: "kimi"
     argv: ["--model", "{model}", "--prompt", "{prompt}"]
     prompt_delivery: argv
+    interactive:
+      # Nao aceita prompt posicional; so `-c/--continue` retoma sessao.
+      supported: false
+      argv: []
+    autonomy:
+      supported: true
+      argv: ["--yolo"]
     default_model: "kimi-k2-chat"
     provides:
       providers: []

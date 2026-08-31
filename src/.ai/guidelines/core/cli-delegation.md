@@ -70,6 +70,45 @@ cli_runners:
 
 Placeholders: `{prompt}`, `{model}`, `{effort}`.
 
+### Abrir em modo interativo
+
+`argv` abre a CLI em modo não interativo — uma tacada só, ideal para um gate
+automático. Para uma sessão que **continua aberta**, e que o Orchestrator possa
+conduzir por `send`, use `interactive.argv`:
+
+```yaml
+interactive:
+  supported: true
+  argv: ["--model", "{model}", "-i", "{prompt}"]
+```
+
+Nem toda CLI aceita prompt inicial numa sessão interativa. Quando
+`interactive.supported` for `false`, não invente: use o modo `argv` de uma
+tacada só. Abrir a TUI sem prompt e tentar "colar" depois é frágil e depende do
+desenho da tela.
+
+### Auto-aprovação (`autonomy`)
+
+Algumas CLIs expõem uma flag que **desliga a confirmação de ferramenta delas**:
+
+```yaml
+autonomy:
+  supported: true
+  argv: ["--dangerously-skip-permissions"]
+```
+
+Regras:
+
+- essa flag **nunca** entra no `argv` padrão. É opt-in por invocação, escolhida
+  conscientemente por quem delega;
+- ela remove a única confirmação que o agente delegado faria por conta própria.
+  A regra do l-nexus de que comando destrutivo exige confirmação humana continua
+  valendo, e passa a depender inteiramente de quem orquestra;
+- **evite em R3.** Trabalho de segurança, dinheiro, dados ou migração destrutiva
+  é exatamente onde a confirmação existe para alguma coisa;
+- se a CLI não tiver equivalente, deixe `supported: false`. Declarar uma flag
+  inexistente faz a delegação falhar logo na abertura.
+
 ### Por que `argv` e não string de shell
 
 `command_template` interpola o prompt dentro de uma string com aspas. Conteúdo de
