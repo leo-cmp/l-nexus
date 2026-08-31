@@ -246,6 +246,38 @@ Sem isso, uma TUI processa tecla a tecla enquanto redesenha e pode embaralhar
 texto longo. Quando a sessão não anuncia suporte, o texto vai cru — os
 marcadores nunca são enviados às cegas.
 
+### Quando o agente delegado pede confirmação
+
+O agente delegado roda dentro do projeto, então ele lê o `AGENTS.md` e obedece à
+regra de parar antes de um comando destrutivo. Só que, nessa topologia, quem
+está do outro lado do cano é o Orchestrator — uma LLM, não o humano.
+
+**O Orchestrator nunca responde uma confirmação destrutiva.** Não envie "sim",
+"pode", "confirmo" nem equivalente. Uma LLM aprovando outra LLM contorna a
+guarda em vez de cumpri-la, e o Orchestrator não tem autoridade que o humano não
+lhe deu.
+
+O que fazer:
+
+1. pare de enviar instruções para aquela sessão;
+2. mostre ao humano o comando exato que o agente quer rodar, o que se perde, e
+   **qual janela** está esperando;
+3. o humano responde **direto na janela** — o teclado dele continua ligado à
+   sessão, porque o supervisor multiplexa teclado e canal de controle. Não é
+   preciso que o Orchestrator repasse a aprovação;
+4. se o humano não estiver presente, marque `orchestration.state: blocked` e
+   pare. Bloquear é o resultado correto, não uma falha.
+
+Duas guardas diferentes protegem isso, e elas falham de formas diferentes:
+
+| Guarda | O que é | Sobrevive à auto-aprovação? |
+|---|---|---|
+| Mecânica | o prompt de permissão da própria CLI | **não** |
+| Instrucional | a regra do `AGENTS.md` que o agente lê | sim, mas depende de obediência |
+
+Por isso `autonomy` não deve ser usado em R3: ali a guarda mecânica é justamente
+a que importa, e sobra só a instrucional.
+
 ### Reaproveitar a sessão no rework
 
 Quando a sessão do executor continua viva, prefira **mandar o rework para ela**

@@ -272,6 +272,12 @@ pelo arquivo de estado e não pela vida da janela. Ao fechar, o supervisor
 derruba o agente junto e grava o resultado; se ele for morto sem gravar,
 `status` responde `orphaned` em vez de mentir `running`.
 
+O agente delegado roda dentro do projeto, então lê o `AGENTS.md` e para antes de
+um comando destrutivo. Mas quem está do outro lado do cano é o Orchestrator, uma
+LLM — então **ele nunca responde essa confirmação**. Ele bloqueia e mostra ao
+humano qual janela espera; o teclado do humano continua ligado à sessão, e ele
+responde direto lá.
+
 A janela é experiência de uso; o **contrato é o diretório de execução**:
 
 ```text

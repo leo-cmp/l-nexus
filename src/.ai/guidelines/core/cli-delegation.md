@@ -106,6 +106,11 @@ Regras:
   valendo, e passa a depender inteiramente de quem orquestra;
 - **evite em R3.** Trabalho de segurança, dinheiro, dados ou migração destrutiva
   é exatamente onde a confirmação existe para alguma coisa;
+- ela não desliga a regra do `AGENTS.md`: o agente continua devendo parar antes
+  de um comando destrutivo. Mas essa guarda é instrucional e depende de
+  obediência, enquanto a que a flag remove era mecânica. Se o agente parar e
+  pedir confirmação, quem responde é o **humano**, nunca o Orchestrator —
+  ver `.ai/guidelines/core/orchestration.md`;
 - se a CLI não tiver equivalente, deixe `supported: false`. Declarar uma flag
   inexistente faz a delegação falhar logo na abertura.
 
