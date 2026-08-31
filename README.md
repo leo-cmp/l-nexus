@@ -18,7 +18,8 @@ npx @leo-cmp/l-nexus install
 | **Subagentes** | Templates e protocolo de isolamento para research, coder, reviewer e qa-tester |
 | **Guidelines** | Regras centrais, delegação por terminal CLI e práticas específicas de stacks |
 | **Templates** | plan.md, task.md, task-short.md, issue-local.md |
-| **Roteamento & CLI Delegation** | Complexidade L1-L3, risco R1-R3, runners configuráveis (`codex`, `claude`, `opencode`, `agy`, etc.) e revisão independente |
+| **Roteamento & CLI Delegation** | Complexidade L1-L3, risco R1-R3, slots `default/alt1/alt2/upgrade_alt1/upgrade_alt2` com effort, runners configuráveis e revisão independente |
+| **Orquestração multi-LLM** | Role `orchestrator` + skill `lnx-orchestrator`: delega executor, tester e reviewer em **terminais visíveis**, coleta resultados estruturados e aplica gates de rework/upgrade |
 | **MCP** | context7, github, sequential-thinking, chrome-devtools, daisyui-github, nudge |
 | **Circuit breakers** | Max 5 skills/sessão, max 3 tentativas/critério, max 10 arquivos/task, loop detection |
 | **Memória entre sessões** | session-memory.md + decisions.md (zero dependência externa) |
@@ -104,6 +105,8 @@ saídas explícitas são `git commit --no-verify` ou a remoção do stub compart
 projeto/
 ├── ⚡ AGENTS.md                  ← ponto de entrada do agente (instruções e atalhos)
 ├── ⚡ CLAUDE.md                  ← idêntico ao AGENTS.md
+├── ⚡ GEMINI.md                  ← ponto de entrada fino p/ runtimes que leem GEMINI.md
+│                                  (preservado se o projeto já tiver o seu)
 ├── .ai/
 │   ├── 🔒 project.md             ← contexto e escopo do projeto (preservado)
 │   ├── 🔒 stack.md               ← stacks ativas do projeto (preservado)
@@ -120,7 +123,11 @@ projeto/
 ├── ⚡ .agents/
 │   ├── hooks/
 │   │   └── lnx-guard.sh        ← guarda versionada de conteúdo protegido (atualizado)
+│   ├── scripts/
+│   │   ├── lnx-run.sh          ← delegação supervisionada em terminal visível (atualizado)
+│   │   └── lnx-pty.py          ← supervisor de PTY: deixa o agente falar com o agente
 │   └── skills/                   ← skills de fluxo (lnx-*), gating (TDD, Debugging) e stacks
+├── .lnx/runtime/                 ← estado transitório de execução (git-ignored)
 ├── ⚡ .claude/
 │   └── skills -> ../.agents/skills
 └── ⚡ .mcp.json                  ← servidores MCP locais
@@ -142,7 +149,8 @@ Organizados pela hierarquia **`/lnx-<recurso>-<ação>`**:
 | `/lnx-projeto-atualizar` | Sincronizar regras e stack do projeto |
 | `/lnx-plano-criar` | Criar plano de fase local (`plan.md`) |
 | `/lnx-task-criar` | Criar tarefa detalhada (`task_X_Y.md`) |
-| `/lnx-task-executar` | Executar próxima tarefa do plano |
+| `/lnx-task-executar` | Executar próxima tarefa do plano (encaminha para o orquestrador quando a task já está roteada) |
+| `/lnx-orchestrator` | Coordenar executor → tester → reviewer em terminais visíveis, com rework e upgrade |
 | `/lnx-task-revisar` | Revisão de diff da tarefa (auto-review) |
 | `/lnx-configurar-roteamento` | Configurar interativamente `model-routing.yaml` e CLIs |
 | `/lnx-nexus-atualizar` | Atualizar pacote l-nexus via `npx @leo-cmp/l-nexus update` |
@@ -155,7 +163,10 @@ Organizados pela hierarquia **`/lnx-<recurso>-<ação>`**:
 ## Requisitos
 
 - Node.js e npm/npx para instalação e validação estruturada das tasks
-- Unix (Linux/macOS/WSL)
+- Unix (Linux/macOS/WSL); Linux é o ambiente prioritário
+- Python 3 (stdlib) para o modo `--io broker`, que permite o Orchestrator
+  conversar com os agentes que abriu. Sem ele, a delegação ainda funciona em
+  `--io tty` (só leitura) ou `--io pipe`
 - Git + GitHub CLI (`gh`) opcional para integração com issues/PRs
 
 Ver [MODEL_REQUIREMENTS.md](MODEL_REQUIREMENTS.md) para configurar perfis,
@@ -169,14 +180,97 @@ Cada task registra separadamente:
 
 - complexidade de implementação (`L1`, `L2`, `L3`);
 - risco de uma implementação incorreta (`R1`, `R2`, `R3`);
+- classificação funcional (`work_type`, categorias, tecnologias, capabilities);
+- o contrato de roteamento, com **modelo + effort** por slot;
 - modelo que criou a task;
-- modelo que realmente executou;
-- modelos que revisaram e o commit avaliado.
+- modelo que realmente executou, com o slot usado e a CLI;
+- execuções de teste e reviews, com o commit avaliado.
 
 R3 sempre exige revisão independente. R2 segue
 `project_policy.r2_review` em `.ai/model-routing.yaml`. O catálogo é do projeto:
 o l-nexus fornece perfis e política, mas não presume que uma marca ou versão
 seja permanentemente superior.
+
+### Slots de roteamento
+
+O Planner escolhe e persiste na task, para o executor (e, quando o gate se
+aplica, para tester e reviewer):
+
+| Slot | Significado |
+|---|---|
+| `default` | preferência normal |
+| `alt1`, `alt2` | alternativas **laterais**: indisponibilidade, rate limit, custo, provedor, especialização, preferência humana — **não** são retry |
+| `upgrade_alt1`, `upgrade_alt2` | escalada **vertical**: só depois de esgotar o rework ou quando a tarefa se revelar materialmente maior |
+
+Cada slot carrega seu próprio `effort` (`default`, `low`, `high`, `max`), porque
+`modelo + effort` é a unidade real de execução. A elegibilidade é resolvida por
+`profile_by_variant[effort]`: o mesmo modelo pode ser elegível em `high` e
+inelegível em `low`.
+
+### Neutralidade
+
+A arquitetura é **model-neutral, provider-neutral, CLI-neutral e
+terminal-adapter-aware**:
+
+```text
+ROLE → MODEL ROUTING (slot + effort) → CLI RUNNER → TERMINAL RUNNER
+```
+
+Nenhum runtime é o orquestrador oficial, nenhum modelo tem CLI fixa e nenhum
+emulador de terminal está preso à arquitetura. Tudo isso é configuração em
+`.ai/model-routing.yaml`, que pertence ao projeto. Um teste do próprio repositório
+falha se um nome de modelo, provedor ou CLI vazar para o código.
+
+### Orquestração com terminais visíveis (Linux-first)
+
+Quando uma task já tem roteamento, o `lnx-orchestrator` delega cada papel em uma
+janela de terminal que você acompanha:
+
+```text
+Terminal principal   Orchestrator
+Terminal visível     Executor  → Tester → Reviewer (um por vez, sequencial)
+```
+
+A detecção percorre `terminal_runners.preference` (tmux, gnome-terminal,
+konsole, xfce4-terminal, kitty, alacritty, wezterm, tilix, terminator, xterm…),
+e um emulador fora da lista entra via `--terminal-cmd` sem alterar o l-nexus. Se
+nenhuma janela puder ser aberta, o l-nexus **não finge que abriu**: ele bloqueia
+com o motivo exato ou roda inline no terminal atual. Agente principal nunca roda
+em background escondido (`&`, `nohup`).
+
+### O agente conduz o agente
+
+O ponto da orquestração não é o humano digitar em várias janelas: é o
+Orchestrator **abrir e conduzir** os outros agentes, enquanto você assiste.
+
+```bash
+lnx-run.sh start ... --io broker --detach     # abre e devolve o controle
+lnx-run.sh send  <run-dir> --text "REWORK: ..."  # o Orchestrator digita
+lnx-run.sh read  <run-dir> --plain --tail 40     # e lê, sem escape codes
+```
+
+Isso exige ser dono do PTY. Um pipe tira o TTY e o agente interativo não desenha
+nada; `script` dá TTY mas não dá entrada; injetar em tty alheio precisaria do
+ioctl `TIOCSTI`, desabilitado nos kernels atuais. Por isso o supervisor do
+l-nexus (`lnx-pty.py`, stdlib do Python) segura o PTY master e multiplexa o
+teclado do humano com um FIFO de controle. `status` informa `can_send`, e um
+modo sem canal nunca finge que aceita instrução.
+
+No rework, se a sessão do executor ainda está viva, o Orchestrator manda a
+correção **para ela** — o contexto é preservado e não nasce uma janela por
+tentativa.
+
+A janela é experiência de uso; o **contrato é o diretório de execução**:
+
+```text
+.lnx/runtime/<task-id>/<run-id>/
+  meta.json  status  exit-code  output.log  prompt.txt  command.txt
+  control.in (FIFO)  result.yaml
+```
+
+`status` e `exit-code` são escritos atomicamente, então o orquestrador sabe com
+segurança quando o agente terminou e qual foi o resultado — sem depender de ler
+o texto da tela.
 
 Valide uma task contra a política do projeto:
 
@@ -196,6 +290,16 @@ npx @leo-cmp/l-nexus migrate-task .planning/tasks/TASK-001.md --write
 
 A migracao marca a task como `R3/legacy-unclassified` ate reclassificacao e
 revisao. O corpo Markdown nao e alterado.
+
+Para adotar os slots do schema 2 em uma task existente:
+
+```bash
+npx @leo-cmp/l-nexus migrate-task .planning/tasks/TASK-001.md --to 2 --write
+```
+
+A migracao reformata a task mas **nao inventa modelo nem effort**: ela marca
+`needs_manual_routing: true` e o validador reprova ate um humano completar o
+roteamento e remover a marca. Tasks no schema 1 continuam validas sem migrar.
 
 ---
 
