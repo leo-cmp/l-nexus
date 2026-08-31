@@ -30,7 +30,7 @@ elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
 elif echo "$COMMITS" | grep -qE "^(fix|perf|refactor)(\(.+\))?:"; then
 	BUMP=patch
 elif echo "$COMMITS" | grep -qE "^docs(\(.+\))?:" &&
-	echo "$CHANGED_FILES" | grep -qE "^(src/)?(\.ai/guidelines/|\.ai/templates/|\.ai/model-routing\.yaml$|\.agents/skills/)"; then
+	echo "$CHANGED_FILES" | grep -qE "^(src/)?(\.ai/guidelines/|\.ai/templates/|\.ai/model-routing\.yaml$|\.agents/skills/|\.agents/scripts/|GEMINI\.md$)"; then
 	BUMP=patch
 else
 	BUMP=none
