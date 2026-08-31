@@ -52,8 +52,10 @@ grep -q "Task routing validation failed" "$TMP_DIR/validate-error.log" ||
   fail "validate-task error output was not forwarded"
 
 "$CLI" migrate-task --help > "$TMP_DIR/migrate-help.log"
-grep -q "Migrates legacy routing metadata" "$TMP_DIR/migrate-help.log" ||
+grep -q "Migrates routing metadata" "$TMP_DIR/migrate-help.log" ||
   fail "migrate-task was not dispatched"
+grep -q -- "--to 1|2" "$TMP_DIR/migrate-help.log" ||
+  fail "migrate-task help omits the schema target option"
 
 node -e '
   const packageJson = require(process.argv[1]);

@@ -131,3 +131,132 @@ model_execution:
   assert.match(partial, /level: R1/);
   assert.match(partial, /model: historical-model/);
 });
+
+// ---------------------------------------------------------------------------
+// Schema 1 -> 2 migration: shape only, never invented routing decisions.
+// ---------------------------------------------------------------------------
+
+const v1Task = `---
+id: TASK-900
+title: Existing
+status: done
+complexity: L2
+risk:
+  level: R2
+  domains: []
+  rationale: Material behaviour change.
+model_plan:
+  created_by:
+    agent: planner
+    provider: provider-plan
+    model: model-plan
+  executor_profile: balanced
+  suggested_models: [model-x, model-y]
+  selection_rationale: Chosen for backend work.
+  reviewer_profile: balanced
+  review_required: true
+  cross_provider_required: false
+model_execution:
+  executor:
+    agent: executor
+    provider: provider-a
+    model: model-executor
+    started_at: 2026-08-16 10:00
+  reviews:
+    - agent: reviewer
+      provider: provider-b
+      model: model-reviewer
+      commit: abc1234
+      reviewed_at: 2026-08-16 10:30
+      verdict: approved
+      findings: No findings.
+---
+# Existing task
+`;
+
+test('migrates a v1 task to the v2 shape without inventing models or effort', () => {
+  const result = migrateTaskContents(v1Task, '<task>', { to: 2 });
+  assert.equal(result.changed, true);
+  const task = frontMatter(result.contents);
+
+  assert.equal(task.model_plan.schema, 2);
+  assert.equal(task.needs_manual_routing, true);
+  assert.deepEqual(task.model_plan.created_by, { agent: 'planner', provider: 'provider-plan', model: 'model-plan' });
+  assert.equal(task.model_plan.executor.required_profile, 'balanced');
+  assert.equal(task.model_plan.reviewer.required_profile, 'balanced');
+  assert.equal(task.model_plan.reviewer.required, true);
+  assert.equal(task.model_plan.reviewer.cross_provider_required, false);
+
+  for (const slot of ['default', 'alt1', 'alt2', 'upgrade_alt1', 'upgrade_alt2']) {
+    assert.equal(task.model_plan.executor[slot], undefined, `slot ${slot} must not be invented`);
+  }
+  assert.deepEqual(task.model_plan.migrated_from.suggested_models, ['model-x', 'model-y']);
+  assert.equal(task.model_plan.executor_profile, undefined);
+  assert.equal(task.model_plan.suggested_models, undefined);
+
+  assert.equal(task.routing_rationale.executor, 'Chosen for backend work.');
+  assert.equal(task.orchestration.mode, 'manual');
+  assert.equal(task.orchestration.state, 'done');
+  assert.deepEqual(task.orchestration.attempts, { executor: 0, reworks: 0, upgrades: 0 });
+
+  assert.equal(task.model_execution.executor.model, 'model-executor');
+  assert.equal(task.model_execution.executor.effort, '');
+  assert.equal(task.model_execution.executor.selection, '');
+  assert.deepEqual(task.model_execution.tests, []);
+  assert.equal(task.model_execution.reviews[0].model, 'model-reviewer');
+  assert.equal(result.contents.slice(result.contents.indexOf('# Existing task')), '# Existing task\n');
+});
+
+test('a v2 migration cannot pass validation until a human completes the routing', () => {
+  const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'l-nexus-migrate-v2-'));
+  const taskPath = path.join(temporaryDirectory, 'task.md');
+  try {
+    writeFileSync(taskPath, migrateTaskContents(v1Task, '<task>', { to: 2 }).contents);
+    const result = spawnSync(process.execPath, [
+      path.join(scriptsDirectory, 'validate-task-routing.mjs'),
+      taskPath,
+      '--routing', path.join(scriptsDirectory, 'fixtures', 'model-routing-v2.yaml'),
+      '--final-commit', 'abc1234',
+    ], { encoding: 'utf8' });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task\.needs_manual_routing: routing migrated to schema 2 is incomplete/);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('the v2 migration is idempotent and chains a legacy task in one run', () => {
+  const once = migrateTaskContents(v1Task, '<task>', { to: 2 });
+  assert.equal(migrateTaskContents(once.contents, '<task>', { to: 2 }).changed, false);
+
+  const chained = migrateTaskContents(legacyTask, '<task>', { to: 2 });
+  const task = frontMatter(chained.contents);
+  assert.equal(task.model_plan.schema, 2);
+  assert.equal(task.risk.level, 'R3');
+  assert.deepEqual(task.model_plan.migrated_from.suggested_models, ['model-a', 'model-b', 'model-c']);
+});
+
+test('the default migration still targets schema 1 only', () => {
+  const task = frontMatter(migrateTaskContents(legacyTask).contents);
+  assert.equal(task.model_plan.schema, undefined);
+  assert.equal(task.model_plan.executor_profile, 'frontier');
+});
+
+test('--to 2 is reachable from the CLI', () => {
+  const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'l-nexus-migrate-v2-'));
+  const taskPath = path.join(temporaryDirectory, 'task.md');
+  try {
+    writeFileSync(taskPath, v1Task);
+    const result = spawnSync(process.execPath, [cli, 'migrate-task', taskPath, '--to', '2', '--write'], { encoding: 'utf8' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(readFileSync(taskPath, 'utf8'), /schema: 2/);
+  } finally {
+    rmSync(temporaryDirectory, { recursive: true, force: true });
+  }
+});
+
+test('rejects an unsupported migration target', () => {
+  const result = spawnSync(process.execPath, [migrator, 'task.md', '--to', '3'], { encoding: 'utf8' });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /--to: must be 1 or 2/);
+});
