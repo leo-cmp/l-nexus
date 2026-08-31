@@ -1,6 +1,6 @@
 {
   "name": "@leo-cmp/l-nexus",
-  "version": "0.11.0",
+  "version": "0.11.1",
   "description": "Central portátil de configuração e diretrizes para agentes de IA — skills, roles, guidelines e templates versionados",
   "bin": {
     "l-nexus": "scripts/cli.mjs"
