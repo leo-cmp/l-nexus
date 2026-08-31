@@ -25,6 +25,11 @@
 - Antes de concluir, valide a politica de roteamento da task. R3 exige parecer
   aprovado de modelo diferente sobre o commit final e, quando configurado, de
   provedor diferente. R2 segue `project_policy.r2_review`.
+- Quando o gate de teste for obrigatorio (R3 sempre; R2 conforme
+  `project_policy.r2_test_gate`), a task so conclui com uma execucao de teste
+  `passed` registrada sobre o commit final. Teste falhando nunca fecha task.
+- Tester e Reviewer verificam; quem corrige e o Executor responsavel. Um achado
+  volta ao executor, nao vira patch do revisor.
 - Auto-review do executor nao conta como revisao independente.
 - Commit de codigo posterior ao commit registrado pelo revisor invalida o
   parecer e exige nova revisao.
@@ -99,6 +104,7 @@ Antes de marcar qualquer task como concluída, confirme TODOS os itens:
 - [ ] Nenhum arquivo de outra task foi alterado acidentalmente
 - [ ] Log de Evidências registrado na task (comando + saída + exit code)
 - [ ] Politica de modelo validada para a task; revisao obrigatoria cobre o commit final
+- [ ] Gate de teste obrigatorio cobre o commit final (quando exigido pelo risco/politica)
 - [ ] Nudge de conclusão enviado ao usuario (conforme `.ai/guidelines/core/nudge.md`)
 - [ ] Skill `revisar` executada: 3/3 perguntas passaram
 - [ ] `plan.md` atualizado com progresso da task

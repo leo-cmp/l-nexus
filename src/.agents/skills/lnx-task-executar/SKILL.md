@@ -6,7 +6,26 @@ disable-model-invocation: false
 
 # Executar Task
 
-## Fluxo
+Esta skill continua sendo a interface humana de execucao. Ela nao duplica a
+logica de coordenacao: quando a task ja traz um contrato de roteamento completo,
+ela encaminha para o Orchestrator.
+
+## Encaminhamento
+
+Depois de localizar a task (passo 1), verifique `model_plan.schema`:
+
+- **`schema: 2`** → ative `lnx-orchestrator` e siga
+  `.ai/guidelines/core/orchestration.md`. O roteamento ja foi decidido pelo
+  Planner; nao escolha modelo de novo. Delegue executor, tester e reviewer em
+  terminais visiveis, colete os resultados estruturados e aplique os gates de
+  rework/upgrade la descritos.
+- **sem `schema`** (task no schema 1) → siga o fluxo abaixo, que continua valido.
+  Para adotar os slots, rode `l-nexus migrate-task <task> --to 2 --write` e
+  complete o roteamento antes de executar.
+- **`needs_manual_routing: true`** → pare. A task veio de migracao e precisa de
+  um humano para completar o roteamento e remover a marca.
+
+## Fluxo (schema 1)
 
 1. **Localizar a task:**
    - Leia `.planning/PLAN_VN/plan.md` do plano ativo.
@@ -16,6 +35,8 @@ disable-model-invocation: false
 2. **Validar a task:**
    - Confirme que a task tem: `id`, `title`, `created_at`, `status`,
      `complexity`, `risk`, `model_plan`, `model_execution` e criterios de aceite.
+   - Rode `npx @leo-cmp/l-nexus validate-task <caminho-da-task>` e nao prossiga
+     enquanto falhar.
    - Consulte `.ai/model-routing.yaml` e confirme que risco, perfis e politica de
      revisao sao coerentes.
    - Confirme que existe issue vinculada (GitHub ou local).
@@ -87,5 +108,7 @@ disable-model-invocation: false
 ## Referencia
 
 - Template de task: `.ai/templates/task.md`
+- Coordenacao de gates e terminais visiveis: `.ai/guidelines/core/orchestration.md`
 - Regras de execucao: `.ai/guidelines/core/execution.md`
 - Regras de planejamento: `.ai/guidelines/core/planning.md`
+- Delegacao por CLI: `.ai/guidelines/core/cli-delegation.md`

@@ -26,12 +26,22 @@
 - Toda task local deve ter issue vinculada (GitHub ou local) antes de ir para execucao, salvo bloqueio explicito.
 - Ao criar task, atualize `plan.md` com status, issue, progresso/listas e ordem de execucao.
 - Toda task executavel deve declarar no cabecalho `complexity`, `risk`,
-  `model_plan` e `model_execution`, conforme `.ai/templates/task.md`.
+  `routing`, `model_plan`, `routing_rationale`, `orchestration` e
+  `model_execution`, conforme `.ai/templates/task.md`.
+- O bloco `routing` classifica funcionalmente a demanda: `work_type`,
+  `categories`, `technologies` e `required_capabilities`. E o que permite o
+  Planner escolher a entrada certa de `work_routes`.
 - Complexidade mede escopo e coordenacao; risco mede a consequencia de uma
   implementacao incorreta. Classifique os dois e nunca use quantidade de
   arquivos como substituto do risco.
-- Consulte `.ai/model-routing.yaml` para resolver perfil de executor, modelos
-  sugeridos e politica de revisao. Nao fixe fornecedor como preferencia global.
+- Consulte `.ai/model-routing.yaml` para resolver perfil de executor, slots de
+  modelo e politica de revisao/teste. Nao fixe fornecedor como preferencia
+  global e nao acople modelo a uma CLI especifica.
+- O Planner resolve e PERSISTE o roteamento completo na task: para o executor,
+  os cinco slots (`default`, `alt1`, `alt2`, `upgrade_alt1`, `upgrade_alt2`),
+  cada um com seu `effort`; para tester e reviewer, ao menos o `default`.
+  `alt1`/`alt2` sao alternativas laterais, `upgrade_alt*` sao escalada vertical.
+- Cada escolha precisa ser auditavel em `routing_rationale`.
 - Risco R2 ou R3 exige `risk.rationale` explicando o impacto concreto da falha.
 - Dominios listados em `risk_domains.generic_r3` sao R3 por padrao. O projeto
   pode acrescentar dominios, mas nao rebaixar um dominio R3 obrigatorio.
@@ -43,6 +53,10 @@
   por `l-nexus migrate-task <task> --write`. Revise a classificacao conservadora
   `R3/legacy-unclassified` antes da execucao; a migracao nao comprova identidade
   nem revisao historica.
+- Tasks no schema 1 continuam validas. Para adotar os slots, rode
+  `l-nexus migrate-task <task> --to 2 --write`: a migracao reformata a task mas
+  nao inventa modelo nem effort, marca `needs_manual_routing: true` e o
+  validador reprova ate um humano completar o roteamento e remover a marca.
 - Ao criar nova task, use o template de `.ai/templates/task.md` como base.
 - Para tarefas L1/R1, use `.ai/templates/task-short.md`. Uma task pequena com
   risco R2 ou R3 usa obrigatoriamente o template completo.
