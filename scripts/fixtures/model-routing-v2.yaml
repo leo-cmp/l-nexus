@@ -1,0 +1,152 @@
+schema_version: 2
+project_policy:
+  r2_review: required
+  r2_test_gate: required
+  r3_cross_provider: true
+  unknown_model_identity: reject_for_r3
+profiles:
+  economical:
+    description: Local work
+    rank: 1
+  balanced:
+    description: Bounded work
+    rank: 2
+  frontier:
+    description: High-risk work
+    rank: 3
+models:
+  model-executor:
+    provider: provider-a
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, tests, sql]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+  model-reviewer:
+    provider: provider-b
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, tests, review]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+  model-tester:
+    provider: provider-c
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, tests]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+  model-economical:
+    provider: provider-c
+    profile: economical
+    profile_by_variant:
+      default: economical
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, tests]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+  model-variant:
+    provider: provider-b
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, tests, sql, review]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+  model-retired:
+    provider: provider-a
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: frontier
+      high: frontier
+      max: frontier
+    status: deprecated
+    capabilities: [backend, tests, sql, review]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
+risk_domains:
+  generic_r3:
+    - authentication-authorization
+    - secrets-cryptography
+    - payments-money
+    - destructive-data-migrations
+    - personal-data-lifecycle
+    - tenant-account-isolation
+    - backup-restore-deployment
+    - material-concurrency-idempotency
+  project: []
+routes:
+  R1:
+    executor_profile: economical
+    review: optional
+    test_gate: optional
+    independent_model: false
+  R2:
+    executor_profile: balanced
+    review: project_policy
+    test_gate: project_policy
+    tester_profile: balanced
+    reviewer_profile: balanced
+    independent_model: true
+  R3:
+    executor_profile: frontier
+    review: required
+    test_gate: required
+    tester_profile: balanced
+    reviewer_profile: frontier
+    independent_model: true
+    cross_provider: project_policy
+execution_policy:
+  max_same_executor_reworks: 1
+  max_upgrades: 1
+  max_total_execution_attempts: 3
+cli_runners:
+  runner-a:
+    binary: runner-a
+    argv: ["--model", "{model}", "{prompt}"]
+    prompt_delivery: argv
+    effort:
+      supported: false
+  runner-effort:
+    binary: runner-effort
+    argv: ["--model", "{model}", "--effort", "{effort}", "{prompt}"]
+    prompt_delivery: argv
+    effort:
+      supported: true
+      argv: ["--effort", "{effort}"]
+      mapping: { low: low, high: high, max: max }
+  runner-partial:
+    binary: runner-partial
+    argv: ["--model", "{model}", "--effort", "{effort}", "{prompt}"]
+    prompt_delivery: argv
+    effort:
+      # Esta CLI nao expoe um nivel equivalente a `max`.
+      supported: true
+      argv: ["--effort", "{effort}"]
+      mapping: { low: low, high: high }
+terminal_runners:
+  preference: [xterm]
+  fallback: inline
