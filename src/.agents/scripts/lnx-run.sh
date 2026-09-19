@@ -561,6 +561,20 @@ command_wait() {
 
 # --- detect-terminal -------------------------------------------------------
 
+# Resolve o modo de io que `start` escolheria com a mesma entrega. Existe como
+# funcao porque `detect-terminal` precisa RELATAR o que `start` vai fazer:
+# duplicar a escada garante divergencia na primeira vez que ela mudar.
+# Prefere o broker, unico modo em que o orquestrador consegue falar de volta
+# com o agente delegado; depois o PTY simples; depois o pipe.
+resolve_io_mode() {
+    local delivery="${1:-argv}"
+    if [ "$delivery" = stdin ]; then printf 'pipe'
+    elif command -v python3 >/dev/null 2>&1 && [ -f "$PTY_SUPERVISOR" ]; then printf 'broker'
+    elif command -v script >/dev/null 2>&1; then printf 'tty'
+    else printf 'pipe'
+    fi
+}
+
 command_detect_terminal() {
     local requested='' preference="$DEFAULT_TERMINAL_PREFERENCE" adapter
     TERMINAL_CMD=()
@@ -574,7 +588,7 @@ command_detect_terminal() {
     done
     if adapter="$(resolve_terminal "$requested" "$preference")"; then
         printf 'terminal=%s\n' "$adapter"
-    printf 'io=%s\n' "$io"
+        printf 'io=%s\n' "$(resolve_io_mode argv)"
         return 0
     fi
     printf 'terminal=none\n'
@@ -642,13 +656,7 @@ command_start() {
         command -v script >/dev/null 2>&1 || die 'start: --io tty needs util-linux `script`, which is not installed' 2
     fi
     if [ "$io" = auto ]; then
-        # Prefer the broker: it is the only mode where the orchestrator can talk
-        # back to the delegated agent. Then a plain PTY, then the pipe.
-        if [ "$delivery" = stdin ]; then io=pipe
-        elif command -v python3 >/dev/null 2>&1 && [ -f "$PTY_SUPERVISOR" ]; then io=broker
-        elif command -v script >/dev/null 2>&1; then io=tty
-        else io=pipe
-        fi
+        io="$(resolve_io_mode "$delivery")"
     fi
     case "$hold_seconds" in ''|*[!0-9]*) die 'start: --hold-seconds must be a non-negative integer' 2 ;; esac
     case "$timeout" in ''|*[!0-9]*) die 'start: --timeout must be a non-negative integer' 2 ;; esac

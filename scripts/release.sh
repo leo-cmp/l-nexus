@@ -91,6 +91,13 @@ echo "$NEW_VERSION" > VERSION
 [ -f package.json ] && sed -i "s/\"version\": \".*\"/\"version\": \"$NEW_VERSION\"/" package.json
 git add VERSION
 [ -f package.json ] && git add package.json
+# O lockfile carrega a versao em dois lugares e nao acompanhava o bump, entao
+# ele derivava a cada release -- estava em 0.6.0 com o package.json em 0.11.1.
+# `--package-lock-only` atualiza o arquivo sem tocar em node_modules.
+if [ -f package-lock.json ] && command -v npm >/dev/null 2>&1; then
+	npm install --package-lock-only --silent >/dev/null 2>&1 || true
+	git add package-lock.json
+fi
 git commit -m "chore: bump version to $NEW_VERSION"
 
 TAG_MESSAGE="Release $NEW_TAG

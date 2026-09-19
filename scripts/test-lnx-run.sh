@@ -49,6 +49,20 @@ grep -q 'no graphical session' <<<"$output" || fail "detect-terminal did not exp
 output="$(headless "$RUNNER" detect-terminal --terminal gnome-terminal 2>&1)"
 [ $? -ne 0 ] || fail "an unavailable named adapter was reported as usable"
 
+# --- detection reports the io mode on the SUCCESS path ----------------------
+#
+# This case exists because the failure path returns before it ever reads the
+# io mode, so every earlier test passed while the success path died on an
+# unbound variable under `set -u`. Detection has to say which io mode `start`
+# would pick, or the orchestrator cannot tell whether it will be able to talk
+# back to the delegated agent.
+
+output="$(headless "$RUNNER" detect-terminal --terminal custom --terminal-cmd "$BIN/fake-agent" 2>&1)"
+status=$?
+[ "$status" -eq 0 ] || fail "detect-terminal failed with a usable custom adapter: $output"
+grep -q '^terminal=custom$' <<<"$output" || fail "detect-terminal did not report the custom adapter"
+grep -qE '^io=(broker|tty|pipe)$' <<<"$output" || fail "detect-terminal did not report a valid io mode: $output"
+
 # --- block is the default when no terminal can be opened -------------------
 
 printf 'do the work\n' > "$TMP_DIR/prompt.txt"
