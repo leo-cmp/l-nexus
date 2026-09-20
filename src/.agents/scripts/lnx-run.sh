@@ -35,7 +35,8 @@ usage() {
 Usage:
   lnx-run.sh detect-terminal [--terminal NAME] [--terminal-preference a,b,c]
   lnx-run.sh start --task ID --role ROLE --runner NAME --runner-bin BIN
-                   [--runner-arg ARG]... [--slot SLOT] [--model M] [--effort E]
+                   [--runner-arg ARG]... [--observe-bin BIN] [--observe-arg ARG]...
+                   [--slot SLOT] [--model M] [--effort E]
                    [--prompt-file FILE] [--prompt-delivery argv|file|stdin]
                    [--attempt N] [--cwd DIR] [--run-root DIR]
                    [--terminal auto|none|NAME] [--terminal-cmd ARG]...
@@ -59,6 +60,14 @@ Placeholders substituted per argv element (never through a shell):
 
 Run directory contract:
   meta.json  status  exit-code  output.log  prompt.txt  command.txt  result.yaml
+  observed-model  which model actually answered, when a runner can report it.
+                  Written by --observe-bin, whose argv takes {run_dir} and
+                  {output_log}. Best-effort: its failure never fails the run.
+  observed-effort  which reasoning effort was actually applied, when the
+                  observer reports it. Same --observe-bin, second line of
+                  output: line 1 is the model, line 2 (optional) is the
+                  effort. An observer that only prints one line still works
+                  exactly as before; observed-effort is simply not written.
 USAGE
 }
 
@@ -281,6 +290,33 @@ command_supervise() {
             write_state "$run_dir/status" done
         else
             write_state "$run_dir/status" failed
+        fi
+    fi
+
+    # Quem ATENDEU nao e necessariamente quem foi PEDIDO: uma CLI com fallback
+    # troca de modelo sozinha quando o primario esta sobrecarregado, e um proxy
+    # troca quando a cota acaba. Nem toda CLI conta qual foi -- das instaladas,
+    # so uma conta. Por isso o observador e opcional e configurado por runner:
+    # o kit define onde a evidencia mora, a maquina define como obte-la.
+    #
+    # Best-effort de proposito. Observador que falha nao derruba a execucao: a
+    # ausencia da evidencia ja e a informacao, e perder o trabalho do agente por
+    # causa dela seria trocar um problema por outro maior.
+    if [ -f "$run_dir/observe.argv" ]; then
+        local observe_argv=() observe_out='' observed='' observed_effort=''
+        mapfile -d '' -t observe_argv < "$run_dir/observe.argv"
+        if [ "${#observe_argv[@]}" -gt 0 ]; then
+            observe_out="$("${observe_argv[@]}" 2>/dev/null)"
+            observed="$(printf '%s\n' "$observe_out" | sed -n '1p' | tr -d '\r')"
+            [ -n "$observed" ] && write_state "$run_dir/observed-model" "$observed"
+
+            # O nivel de esforco pode ser sobrescrito num seletor de dashboard do
+            # proxy, invisivel para o kit e para o registro da task: a task pode
+            # declarar effort: high e ter rodado em low sem que nada acuse. A
+            # segunda linha e opcional de proposito -- observador que so imprime
+            # o modelo continua funcionando exatamente como antes, sem esse arquivo.
+            observed_effort="$(printf '%s\n' "$observe_out" | sed -n '2p' | tr -d '\r')"
+            [ -n "$observed_effort" ] && write_state "$run_dir/observed-effort" "$observed_effort"
         fi
     fi
 
@@ -605,6 +641,7 @@ command_start() {
     local fallback=block hold=keep hold_seconds=30 timeout=0
     local banner=compact detach=false io=auto
     local runner_args=()
+    local observe_bin='' observe_args=()
     TERMINAL_CMD=()
 
     while [ "$#" -gt 0 ]; do
@@ -617,6 +654,8 @@ command_start() {
             --runner) runner="${2:-}"; shift 2 ;;
             --runner-bin) runner_bin="${2:-}"; shift 2 ;;
             --runner-arg) runner_args+=("${2:-}"); shift 2 ;;
+            --observe-bin) observe_bin="${2:-}"; shift 2 ;;
+            --observe-arg) observe_args+=("${2:-}"); shift 2 ;;
             --prompt-file) prompt_file="${2:-}"; shift 2 ;;
             --prompt-delivery) delivery="${2:-}"; shift 2 ;;
             --attempt) attempt="${2:-}"; shift 2 ;;
@@ -699,6 +738,26 @@ command_start() {
             *) argv+=("$element") ;;
         esac
     done
+
+    # O observador recebe o diretorio do run e imprime, na primeira linha, o
+    # modelo que atendeu. Como cada CLI expoe isso de um jeito (ou nao expoe),
+    # a extracao fica na configuracao da maquina e o kit nao ganha dependencia.
+    if [ -n "$observe_bin" ]; then
+        command -v "$observe_bin" >/dev/null 2>&1 ||
+            die "start: --observe-bin not found: $observe_bin" 2
+        local observe_argv=("$observe_bin") observe_element
+        for observe_element in ${observe_args[@]+"${observe_args[@]}"}; do
+            case "$observe_element" in
+                '{run_dir}') observe_argv+=("$run_dir") ;;
+                '{output_log}') observe_argv+=("$run_dir/output.log") ;;
+                *) observe_argv+=("$observe_element") ;;
+            esac
+        done
+        printf '%s\0' "${observe_argv[@]}" > "$run_dir/observe.argv"
+    elif [ "${#observe_args[@]}" -gt 0 ]; then
+        die 'start: --observe-arg requires --observe-bin' 2
+    fi
+
 
     printf '%s\0' "${argv[@]}" > "$run_dir/command.argv"
     printf '%q ' "${argv[@]}" > "$run_dir/command.txt"

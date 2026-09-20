@@ -44,11 +44,11 @@ Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova 
    - Preencha `model_plan.schema: 2` e `model_plan.created_by` com a sua
      identidade real. Use `unknown` quando o runtime nao expuser o modelo — nunca
      infira pelo nome do agente, da CLI ou do provedor.
-   - Escolha e persista, para o **executor**, os cinco slots com effort proprio:
+   - Escolha e persista, para o **executor**, os slots com effort proprio:
      | Slot | Significado |
      |---|---|
      | `default` | preferencia normal |
-     | `alt1`, `alt2` | alternativas LATERAIS: indisponibilidade, rate limit, custo, provedor, especializacao, preferencia humana. **Nao** sao retry do default |
+     | `alt1`, `alt2`, `alt3` | alternativas LATERAIS: indisponibilidade, rate limit, custo, provedor, especializacao, preferencia humana. **Nao** sao retry do default. `alt3` e opcional e fecha a fila: e o lugar do modelo de cota curta |
      | `upgrade_alt1`, `upgrade_alt2` | escalada VERTICAL: so quando a tarefa se revelar materialmente maior ou o rework se esgotar |
    - Faca o mesmo para **tester** e **reviewer** (ao menos o `default`), quando o
      gate se aplicar.
@@ -57,6 +57,12 @@ Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova 
      no perfil minimo, `capabilities` cobrindo `required_capabilities`, upgrade
      nunca mais fraco que o default, reviewer diferente do executor quando houver
      independencia e, em R3 com cross-provider, de outro provedor.
+   - Nenhum modelo pode aparecer em dois papeis. Repetir dentro de um papel e
+     permitido; atravessar papeis nao, porque abre a porta para o mesmo modelo
+     executar e depois avalizar o proprio trabalho.
+   - Duas laterais com o mesmo modelo e effort nao sao duas alternativas: a
+     mesma cota esgotada derruba as duas. Prefira provedores diferentes nos
+     papeis de gate, senao o papel fica sem saida quando a cota acabar.
    - Explique cada decisao em `routing_rationale`.
    - Deixe `orchestration` no estado inicial (`mode: manual`, `state: pending`,
      contadores em zero) e `model_execution` vazio: proveniencia e preenchida
@@ -66,6 +72,14 @@ Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova 
      npx @leo-cmp/l-nexus validate-task <caminho-da-task>
      ```
      Corrija o que o validador apontar em vez de relaxar o roteamento.
+   - Com a task validando, **congele o plano**:
+     ```bash
+     npx @leo-cmp/l-nexus validate-task <caminho-da-task> --write-plan-hash
+     ```
+     A flag grava `model_plan.plan_hash`. Congelar aqui e o que impede que, mais
+     tarde, quem executa acrescente um slot e seja aprovado contra o plano que
+     ele mesmo acabou de editar. Mudar o plano depois disso e replanejar: leva
+     ao humano, nunca a um hash regravado.
 
 5. **Criar a Issue no GitHub:**
    - Confirme o repositório oficial (`git remote -v` ou `gh repo view`) conforme `.ai/project.md` antes de criar qualquer coisa remota.

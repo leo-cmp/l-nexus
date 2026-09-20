@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -567,6 +567,29 @@ test('item 1: rejects a frozen plan that changed after hashing', () => {
   }
 });
 
+test('item 1: the frozen hash survives a reformat that does not change the plan', () => {
+  // A serializacao e canonica de proposito: reescrever o mesmo slot em estilo
+  // flow, ou em outra ordem de chaves, nao muda o plano e nao pode invalidar o
+  // congelamento. Sem isto, qualquer reformatacao viraria acusacao de fraude.
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-hash-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    spawnSync(process.execPath, [validator, taskPath, '--routing', routingV2, '--write-plan-hash'], { encoding: 'utf8' });
+    const reformatted = readFileSync(taskPath, 'utf8').replace(
+      '    alt1:\n      model: model-variant\n      effort: high',
+      '    alt1: { effort: high, model: model-variant }',
+    );
+    assert.notEqual(reformatted, readFileSync(taskPath, 'utf8'));
+    writeFileSync(taskPath, reformatted);
+    const result = validateV2('v2-r3-valid.md', { taskPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /plan_hash/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('item 1: rejects a plan_hash that is not a non-empty string', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace('  schema: 2\n', '  schema: 2\n  plan_hash: ""\n'), (result) => {
     assert.notEqual(result.status, 0);
@@ -641,9 +664,12 @@ test('item 3: does not treat a shared prefix shorter than 7 hex chars as a match
 // ---------------------------------------------------------------------------
 
 test('item 4: accepts an execution that records the alt3 lateral slot', () => {
+  // alt3 aponta para um modelo que nenhum outro slot usa, entao passar aqui
+  // prova que o slot foi mesmo resolvido, e nao confundido com alt2.
   withTemporaryTask('v2-r3-valid.md', (task) => task
     .replace('    selection: default\n    agent: executor', '    selection: alt3\n    agent: executor')
-    .replace('    model: model-executor\n    provider: provider-a\n    effort: high', '    model: model-executor\n    provider: provider-a\n    effort: max'),
+    .replace('    model: model-executor\n    provider: provider-a\n    effort: high\n    runner: runner-a',
+      '    model: model-lateral\n    provider: provider-d\n    effort: max\n    runner: runner-effort'),
   (result) => {
     assert.equal(result.status, 0, result.stderr);
   });
@@ -651,7 +677,7 @@ test('item 4: accepts an execution that records the alt3 lateral slot', () => {
 
 test('item 4: a plan without alt3 stays valid (compatibility)', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
-    '    alt3:\n      model: model-executor\n      effort: max\n',
+    '    alt3:\n      model: model-lateral\n      effort: max\n',
     '',
   ), (result) => {
     assert.equal(result.status, 0, result.stderr);
@@ -717,4 +743,231 @@ test('item 6: warns when every reviewer slot uses the same provider', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Git como testemunha do plano.
+// ---------------------------------------------------------------------------
 
+// A testemunha so existe dentro de um repositorio, entao estes testes montam
+// um: a task entra no historico como o Planner a criou, sem execucao
+// registrada, e so depois a arvore de trabalho recebe a versao em execucao.
+function withTaskInRepository(fixture, { committed, working }, assertions) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-witness-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    const source = fixtureSource(fixture);
+    const git = (...args) => spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+    writeFileSync(taskPath, committed(source));
+    git('init', '-q', '.');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'test');
+    git('add', 'task.md');
+    git('commit', '-qm', 'task created');
+    writeFileSync(taskPath, working(source));
+    assertions(validateV2(fixture, { taskPath }), taskPath, directory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+// Como o Planner deixa a task: plano escrito, nada executado ainda.
+function asCreated(source) {
+  return source.replace(/\nmodel_execution:[\s\S]*?\n---\n/, '\n---\n');
+}
+
+// O ataque: um slot do plano muda depois que a execucao ja foi registrada.
+function withEditedPlan(source) {
+  return source.replace('    alt3:\n      model: model-lateral\n      effort: max',
+    '    alt3:\n      model: model-lateral\n      effort: high');
+}
+
+test('git witness: rejects a plan edited after execution was recorded', () => {
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: withEditedPlan }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task\.model_plan: differs from the plan committed in [0-9a-f]{7}, the last version recorded before execution started/);
+  });
+});
+
+test('git witness: rewriting plan_hash does not rescue an edited plan', () => {
+  // E o furo que a testemunha existe para fechar: quem pode rodar
+  // --write-plan-hash regrava o hash do proprio plano editado e o congelamento
+  // volta a bater. O historico nao acompanha essa edicao.
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: withEditedPlan }, (result, taskPath) => {
+    assert.notEqual(result.status, 0);
+    const refrozen = spawnSync(process.execPath, [
+      validator, taskPath, '--routing', routingV2, '--write-plan-hash',
+    ], { encoding: 'utf8' });
+    assert.equal(refrozen.status, 0, refrozen.stderr);
+    const after = validateV2('v2-r3-valid.md', { taskPath });
+    assert.notEqual(after.status, 0);
+    assert.doesNotMatch(after.stderr, /plan_hash: does not match/);
+    assert.match(after.stderr, /task\.model_plan: differs from the plan committed in/);
+  });
+});
+
+test('git witness: --allow-replan downgrades the mismatch to a warning', () => {
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: withEditedPlan }, (result, taskPath) => {
+    const allowed = spawnSync(process.execPath, [
+      validator, taskPath, '--routing', routingV2, '--final-commit', 'abc1234', '--allow-replan',
+    ], { encoding: 'utf8' });
+    assert.equal(allowed.status, 0, allowed.stderr);
+    assert.match(allowed.stderr, /accepted because --allow-replan was passed/);
+  });
+});
+
+test('git witness: accepts the same plan that was committed before execution', () => {
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: (source) => source }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /differs from the plan committed/);
+  });
+});
+
+test('git witness: warns instead of failing when the task is not tracked by git', () => {
+  // Fora de um repositorio nao ha testemunho, e nao ter testemunho e um risco
+  // conhecido — nao uma violacao de contrato.
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-witness-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    const result = validateV2('v2-r3-valid.md', { taskPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /task\.model_plan: is not tracked by git/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('git witness: warns when no committed version predates the execution record', () => {
+  // A task entrou no historico ja com execucao registrada: nao da para saber
+  // qual era o plano quando o trabalho comecou, e inventar um testemunho seria
+  // pior do que nao ter nenhum.
+  withTaskInRepository('v2-r3-valid.md', { committed: (source) => source, working: (source) => source }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /has no committed version predating its execution record/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prova de ocorrencia: a linha da task contra o registro do lnx-run.
+// ---------------------------------------------------------------------------
+
+// O validador procura o diretorio que o lnx-run.sh grava. Estes testes montam
+// esse diretorio a mao, no mesmo formato do script, e deixam a task ao lado
+// dele — que e tambem o caminho que a busca por .lnx/runtime percorre.
+const RUN_ID = '20260816T102500Z-reviewer-1-4242';
+
+function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', observedModel = null, observedEffort = null, patch = (task) => task }, assertions) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-run-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, patch(fixtureSource('v2-r3-valid.md')));
+    const runDirectory = path.join(directory, '.lnx', 'runtime', 'TASK-V2-R3', runId);
+    mkdirSync(runDirectory, { recursive: true });
+    writeFileSync(path.join(runDirectory, 'meta.json'), JSON.stringify({
+      schema: 1,
+      run_id: runId,
+      task: 'TASK-V2-R3',
+      role: 'reviewer',
+      slot: 'default',
+      model: 'model-reviewer',
+      effort: 'high',
+      runner: 'runner-a',
+      started_at: '2026-08-16T10:25:00Z',
+      ...meta,
+    }, null, 2));
+    if (exitCode !== null) writeFileSync(path.join(runDirectory, 'exit-code'), `${exitCode}\n`);
+    if (observedModel !== null) writeFileSync(path.join(runDirectory, 'observed-model'), `${observedModel}\n`);
+    if (observedEffort !== null) writeFileSync(path.join(runDirectory, 'observed-effort'), `${observedEffort}\n`);
+    assertions(validateV2('v2-r3-valid.md', { taskPath }), runDirectory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function withReviewRunId(runId) {
+  return (task) => task.replace('      reviewed_at: 2026-08-16 10:30',
+    `      run_id: ${runId}\n      reviewed_at: 2026-08-16 10:30`);
+}
+
+test('run evidence: warns when a required gate is not backed by a run_id', () => {
+  const result = validateV2('v2-r3-valid.md');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /reviews\[0\]\.run_id: is absent, so this gate rests on what the task says about itself/);
+});
+
+test('run evidence: accepts a review backed by a matching run record', () => {
+  withRunRecord({ patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /reviews\[0\]\.run_id/);
+  });
+});
+
+test('run evidence: rejects a run_id with no run record', () => {
+  withRunRecord({ patch: withReviewRunId('20260816T999999Z-reviewer-9-1') }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /reviews\[0\]\.run_id: has no run record at /);
+  });
+});
+
+test('run evidence: rejects a run record that belongs to another task', () => {
+  // O caso do run_id copiado: o registro existe e esta perfeito, mas e de outra
+  // task. Quem desmente e o campo `task` do proprio registro.
+  withRunRecord({ meta: { task: 'TASK-OTHER' }, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /belongs to task TASK-OTHER, not to TASK-V2-R3/);
+  });
+});
+
+test('run evidence: rejects a run record whose model is not the declared one', () => {
+  withRunRecord({ meta: { model: 'model-variant' }, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /records model model-variant, but the task declares model-reviewer/);
+  });
+});
+
+test('run evidence: rejects a run that never finished', () => {
+  withRunRecord({ exitCode: null, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /without exit-code, so the run never finished/);
+  });
+});
+
+test('run evidence: accepts a run whose observed model is the declared one', () => {
+  withRunRecord({ observedModel: 'model-reviewer', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('run evidence: rejects a run served by a model other than the declared one', () => {
+  // O caso que nenhuma outra checagem alcanca: a task declara o modelo certo, o
+  // registro do run concorda, e ainda assim quem atendeu foi outro -- porque a
+  // CLI caiu para um fallback ou o proxy trocou por cota. So quem executou sabe.
+  withRunRecord({ observedModel: 'model-variant', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ran on model-variant, not on the declared model-reviewer/);
+  });
+});
+
+test('run evidence: accepts a run whose observed effort is the declared one', () => {
+  withRunRecord({ observedEffort: 'high', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('run evidence: rejects a run applied at an effort other than the declared one', () => {
+  // O mesmo caso do modelo, um nivel abaixo: a task declara effort: high, o
+  // registro do run concorda, mas o seletor de dashboard do proxy do gateway
+  // sobrescreveu o esforco pedido -- invisivel para o kit e para a task.
+  withRunRecord({ observedEffort: 'low', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ran at effort low, not at the declared high/);
+  });
+});
+
+test('run evidence: rejects a run that started after the result it backs', () => {
+  // Quatro dias depois do parecer que ele deveria sustentar: passa longe de
+  // qualquer duvida de fuso horario.
+  withRunRecord({ meta: { started_at: '2026-08-20T10:00:00Z' }, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /after the reviewer result it is supposed to back/);
+  });
+});

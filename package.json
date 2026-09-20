@@ -5,6 +5,9 @@
   "bin": {
     "l-nexus": "scripts/cli.mjs"
   },
+  "scripts": {
+    "test": "bash scripts/run-all-tests.sh"
+  },
   "files": [
     "src/",
     "scripts/cli.mjs",
@@ -13,6 +16,7 @@
     "scripts/validate-task-routing.mjs",
     "scripts/migrate-task-routing.mjs",
     "scripts/migrate-routing.mjs",
+    "scripts/sync-routing.mjs",
     "MODEL_REQUIREMENTS.md",
     "VERSION"
   ],

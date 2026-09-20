@@ -20,13 +20,20 @@ routing:
   technologies: []
   required_capabilities: []
 # Contrato de roteamento resolvido pelo Planner e executado pelo Orchestrator.
-# default        preferencia normal
-# alt1 / alt2    alternativas LATERAIS (indisponibilidade, custo, rate limit,
-#                provedor, especializacao, preferencia humana) — nao sao retry
-# upgrade_alt*   escalada VERTICAL, so apos esgotar rework ou quando a tarefa se
-#                revelou materialmente maior
+# default             preferencia normal
+# alt1 / alt2 / alt3  alternativas LATERAIS (indisponibilidade, custo, rate limit,
+#                     provedor, especializacao, preferencia humana) — nao sao retry.
+#                     alt3 e opcional e fecha a fila: e o lugar do modelo de cota
+#                     curta. Duas laterais iguais nao sao duas alternativas.
+# upgrade_alt*        escalada VERTICAL, so apos esgotar rework ou quando a tarefa
+#                     se revelou materialmente maior
 # effort: default | low | high | max — resolve a elegibilidade via profile_by_variant
 # Os valores de `model` sao CHAVES do catalogo `models:` do model-routing.yaml.
+# Um modelo nao pode aparecer em dois papeis: quem executa nao testa nem revisa.
+# Ao terminar de preencher, congele o bloco:
+#   npx @leo-cmp/l-nexus validate-task <caminho-da-task> --write-plan-hash
+# A flag grava `plan_hash` aqui. Depois disso, mexer em qualquer slot e
+# replanejar — precisa do humano, nunca de um hash regravado.
 model_plan:
   schema: 2
   created_by:
@@ -44,6 +51,9 @@ model_plan:
       effort: "[default | low | high | max]"
     alt2:
       model: "[chave do catalogo]"
+      effort: "[default | low | high | max]"
+    alt3:
+      model: "[chave do catalogo ou remova o slot]"
       effort: "[default | low | high | max]"
     upgrade_alt1:
       model: "[chave do catalogo]"

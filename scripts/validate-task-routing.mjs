@@ -2,7 +2,8 @@
 
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
 import { parseDocument } from 'yaml';
 
@@ -36,12 +37,17 @@ const ATTEMPT_BUDGETS = new Map([
 
 function usage() {
   return `Usage:
-  validate-task-routing.mjs <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash]
-  l-nexus validate-task <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash]
+  validate-task-routing.mjs <task-path> [--routing <path>] [--final-commit <sha>] [--write-plan-hash] [--allow-replan] [--runtime-root <path>]
+  l-nexus validate-task <task-path> [--routing <path>] [--final-commit <sha>] [--write-plan-hash] [--allow-replan] [--runtime-root <path>]
   l-nexus migrate-task <task-path> [--to 1|2] [--write]
 
 Validates task front matter against model-routing.yaml (schema_version 1 or 2).
---write-plan-hash freezes task.model_plan by recording its plan_hash and exits.`;
+--write-plan-hash freezes task.model_plan by recording its plan_hash and exits.
+--allow-replan downgrades the git witness error to a warning. It exists for the
+human who deliberately replanned a task already under execution, and for nobody
+else: an agent that reaches for it is doing exactly what the check forbids.
+--runtime-root points at the lnx-run run directories used to verify run_id
+(default: the nearest .lnx/runtime above the task file).`;
 }
 
 function parseArguments(argv) {
@@ -54,6 +60,8 @@ function parseArguments(argv) {
     routingPath: '.ai/model-routing.yaml',
     finalCommit: null,
     writePlanHash: false,
+    allowReplan: false,
+    runtimeRoot: null,
   };
   while (args.length > 0) {
     const value = args.shift();
@@ -61,10 +69,15 @@ function parseArguments(argv) {
       options.writePlanHash = true;
       continue;
     }
-    if (value === '--routing' || value === '--final-commit') {
+    if (value === '--allow-replan') {
+      options.allowReplan = true;
+      continue;
+    }
+    if (value === '--routing' || value === '--final-commit' || value === '--runtime-root') {
       const optionValue = args.shift();
       if (!optionValue) throw new Error(`cli.${value}: requires a value`);
       if (value === '--routing') options.routingPath = optionValue;
+      else if (value === '--runtime-root') options.runtimeRoot = optionValue;
       else options.finalCommit = optionValue;
       continue;
     }
@@ -149,6 +162,221 @@ function validatePlanHash(plan, field, errors, warnings) {
   if (plan.plan_hash.trim().toLowerCase() !== expected) {
     addError(errors, `${field}.plan_hash`, `does not match the model plan contents (expected ${expected})`);
   }
+}
+
+// Prova de ocorrencia. Todo o resto deste arquivo confere FORMA: se o registro
+// esta bem preenchido, se aponta para um slot que existe, se o modelo consta do
+// catalogo. Nada disso pergunta se a execucao aconteceu. Um agente pode escrever
+// "verdict: approved, findings: sem achados" sem ter chamado revisor nenhum.
+//
+// O lnx-run.sh ja grava, a cada execucao delegada, um diretorio por run com
+// meta.json, exit-code e log. Quem escreve esse diretorio e o script, nao o
+// agente medido. Conferir a linha da task contra esse registro troca o custo de
+// mentir: deixa de ser uma linha de YAML e passa a ser uma arvore de arquivos
+// com carimbos que o agente nao emite.
+//
+// Limite declarado: .lnx/ nao entra no git. A verificacao so vale na maquina que
+// executou — que e onde o gate roda, mas significa que CI nao reconfere depois.
+const RUN_EVIDENCE_FIELDS = [
+  // [campo no meta.json, campo na entrada da task, rotulo no erro]
+  ['role', null, 'role'],
+  ['model', 'model', 'model'],
+  ['effort', 'effort', 'effort'],
+  ['slot', 'selection', 'slot'],
+  ['runner', 'runner', 'runner'],
+];
+
+// Mesma regra do sanitize() do lnx-run.sh, que nomeia o diretorio da task.
+function sanitizeRunPath(value) {
+  return String(value).replace(/[^A-Za-z0-9._-]/g, '_');
+}
+
+// O .lnx/ fica na raiz do projeto e a task, em geral, varios niveis abaixo.
+// Procurar para cima acha a raiz sem exigir que o comando rode de um lugar
+// especifico; sem achar, o padrao e o diretorio corrente, que e onde o
+// orquestrador roda.
+function resolveRuntimeRoot(override, taskPath) {
+  if (override) return override;
+  let directory = path.dirname(path.resolve(taskPath));
+  for (let depth = 0; depth < 12; depth += 1) {
+    const candidate = path.join(directory, '.lnx', 'runtime');
+    if (existsSync(candidate)) return candidate;
+    const parent = path.dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return path.join(process.cwd(), '.lnx', 'runtime');
+}
+
+// Datas: o registro do run e ISO em UTC, o campo da task e texto livre escrito
+// por gente ("2026-08-31 10:30"), sem fuso. Comparar com precisao seria inventar
+// exatidao que o dado nao tem, entao so um disparate e erro: o run comecar mais
+// de um dia DEPOIS do instante que a task diz ter sido avaliado. Isso passa
+// longe de qualquer fuso e ainda pega run_id reaproveitado de outra execucao.
+const RUN_CLOCK_TOLERANCE_MS = 24 * 60 * 60 * 1000;
+
+function parseLooseTimestamp(value) {
+  if (typeof value !== 'string') return null;
+  const normalized = value.trim().replace(' ', 'T');
+  const parsed = Date.parse(/[Zz]|[+-]\d{2}:?\d{2}$/.test(normalized) ? normalized : `${normalized}Z`);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function validateRunEvidence(entry, field, context, errors, warnings) {
+  const { taskId, role, runtimeRoot, declaredAt, countsForGate } = context;
+  const runId = entry.run_id;
+  if (runId === undefined || runId === null) {
+    if (countsForGate) {
+      addWarning(warnings, `${field}.run_id`,
+        'is absent, so this gate rests on what the task says about itself; record the lnx-run run_id to make it verifiable');
+    }
+    return;
+  }
+  if (typeof runId !== 'string' || runId.trim() === '') {
+    addError(errors, `${field}.run_id`, 'must be a non-empty string');
+    return;
+  }
+  const runDirectory = path.join(runtimeRoot, sanitizeRunPath(taskId), runId.trim());
+  const metaPath = path.join(runDirectory, 'meta.json');
+  if (!existsSync(metaPath)) {
+    addError(errors, `${field}.run_id`, `has no run record at ${metaPath}`);
+    return;
+  }
+  let meta;
+  try {
+    meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+  } catch (error) {
+    addError(errors, `${field}.run_id`, `has an unreadable run record at ${metaPath}: ${error.message}`);
+    return;
+  }
+  if (!isObject(meta)) {
+    addError(errors, `${field}.run_id`, `has a run record that is not a JSON object at ${metaPath}`);
+    return;
+  }
+
+  // Um run_id copiado de outra task apontaria para um registro perfeitamente
+  // valido — de outra task. O campo `task` do proprio registro e quem desmente.
+  if (sanitizeRunPath(meta.task ?? '') !== sanitizeRunPath(taskId)) {
+    addError(errors, `${field}.run_id`, `belongs to task ${meta.task}, not to ${taskId}`);
+  }
+  for (const [metaKey, entryKey, label] of RUN_EVIDENCE_FIELDS) {
+    const expected = entryKey === null ? role : entry[entryKey];
+    if (expected === undefined || expected === null || expected === '') continue;
+    const recorded = meta[metaKey];
+    if (recorded === undefined || recorded === null || recorded === '') continue;
+    if (String(recorded) !== String(expected)) {
+      addError(errors, `${field}.run_id`, `records ${label} ${recorded}, but the task declares ${expected}`);
+    }
+  }
+
+  // Sem exit-code o run comecou e nao se sabe se terminou. Gate fechado por
+  // execucao que talvez ainda esteja rodando nao e gate.
+  if (!existsSync(path.join(runDirectory, 'exit-code'))) {
+    addError(errors, `${field}.run_id`, 'has a run record without exit-code, so the run never finished');
+  }
+
+  // Quem atendeu nao e necessariamente quem foi pedido: CLI com fallback e
+  // proxy com rodizio trocam de modelo sozinhos. Quando o runner sabe reportar,
+  // o observado vale mais que o declarado — foi medido, nao afirmado.
+  const observedPath = path.join(runDirectory, 'observed-model');
+  if (existsSync(observedPath)) {
+    const observed = readFileSync(observedPath, 'utf8').trim();
+    if (observed !== '' && entry.model !== undefined && observed !== String(entry.model)) {
+      addError(errors, `${field}.run_id`,
+        `ran on ${observed}, not on the declared ${entry.model}; the runner reported what actually answered`);
+    }
+  }
+
+  // Mesmo raciocinio do observed-model, mas para o esforco: um seletor de
+  // dashboard no gateway do proxy repassa ou sobrescreve o esforco pedido, e
+  // essa configuracao nao aparece nem no kit nem no registro da task. Sem isso,
+  // uma task poderia declarar effort: high e ter rodado em low sem denuncia.
+  const observedEffortPath = path.join(runDirectory, 'observed-effort');
+  if (existsSync(observedEffortPath)) {
+    const observedEffort = readFileSync(observedEffortPath, 'utf8').trim();
+    if (observedEffort !== '' && entry.effort !== undefined && observedEffort !== String(entry.effort)) {
+      addError(errors, `${field}.run_id`,
+        `ran at effort ${observedEffort}, not at the declared ${entry.effort}; the runner reported what was actually applied`);
+    }
+  }
+
+  const startedAt = parseLooseTimestamp(meta.started_at);
+  const declared = parseLooseTimestamp(declaredAt);
+  if (startedAt !== null && declared !== null && startedAt - declared > RUN_CLOCK_TOLERANCE_MS) {
+    addError(errors, `${field}.run_id`, `started at ${meta.started_at}, after the ${role} result it is supposed to back (${declaredAt})`);
+  }
+}
+
+// Git como testemunha do plano. O plan_hash prova que o bloco nao mudou desde
+// que foi congelado, mas quem pode rodar --write-plan-hash contorna a prova em
+// um comando: edita o plano, regrava o hash, segue. O historico nao se deixa
+// regravar assim. O arquivo da task ja foi commitado com um plano, e essa
+// versao esta fora do alcance de quem edita o arquivo agora — reescrever o
+// passado exige force-push e deixa rastro. Por isso a comparacao aqui e contra
+// o commit, e nao contra um campo que mora no mesmo arquivo que ela protege.
+const WITNESS_COMMIT_LIMIT = 50;
+
+function gitText(args, cwd) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+}
+
+// A testemunha e a ultima versao commitada ANTES de a execucao comecar: enquanto
+// nenhum executor foi registrado, replanejar e livre e legitimo, e o Planner
+// pode corrigir o plano quantas vezes precisar. Depois do primeiro registro de
+// execucao, o plano e contrato em vigor.
+function findPlanWitness(relativePath, cwd) {
+  const log = gitText(['log', '--format=%H', '--', relativePath], cwd).trim();
+  if (log === '') return null;
+  for (const commit of log.split('\n').slice(0, WITNESS_COMMIT_LIMIT)) {
+    let committed;
+    try {
+      committed = parseTaskFrontMatter(gitText(['show', `${commit}:${relativePath}`], cwd), commit);
+    } catch {
+      // Versao antiga sem front matter legivel nao serve de testemunho.
+      continue;
+    }
+    const execution = committed.model_execution;
+    if (!isObject(execution) || !isObject(execution.executor)) return { commit, plan: committed.model_plan };
+  }
+  return null;
+}
+
+function validatePlanWitness(task, taskPath, field, errors, warnings, { allowReplan = false } = {}) {
+  if (!isObject(task.model_plan)) return;
+  const execution = task.model_execution;
+  if (!isObject(execution) || !isObject(execution.executor)) return;
+
+  const cwd = path.dirname(path.resolve(taskPath));
+  let relativePath;
+  try {
+    relativePath = gitText(['ls-files', '--full-name', '--error-unmatch', '--', path.basename(taskPath)], cwd).trim();
+  } catch {
+    addWarning(warnings, field, 'is not tracked by git, so the plan has no witness outside the task file itself');
+    return;
+  }
+
+  let witness;
+  try {
+    witness = findPlanWitness(relativePath, cwd);
+  } catch {
+    addWarning(warnings, field, 'could not be read from git history, so the plan has no witness outside the task file itself');
+    return;
+  }
+  // Nenhuma versao commitada antecede a execucao: o arquivo entrou no historico
+  // ja com execucao registrada. Nao da para saber qual era o plano quando o
+  // trabalho comecou, e inventar um testemunho seria pior que nao ter nenhum.
+  if (!witness || !isObject(witness.plan)) {
+    addWarning(warnings, field,
+      'has no committed version predating its execution record, so git cannot witness the plan that was in force');
+    return;
+  }
+
+  // Compara o conteudo, nao o plan_hash: regravar o hash nao muda o plano, e
+  // mudar o plano nao escapa por regravar o hash.
+  if (computePlanHash(task.model_plan) === computePlanHash(witness.plan)) return;
+  const message = `differs from the plan committed in ${witness.commit.slice(0, 7)}, the last version recorded before execution started; editing the plan after the work began is replanning`;
+  if (allowReplan) addWarning(warnings, field, `${message} (accepted because --allow-replan was passed)`);
+  else addError(errors, field, message);
 }
 
 // Compara commits por prefixo de SHA: um SHA curto e o SHA completo do mesmo
@@ -595,7 +823,7 @@ function validateExecutionIdentityV2(errors, record, field, routing, requiredPro
   validateRunnerEffortSupport(errors, record, field, routing, requiredProfile);
 }
 
-function validateTask(task, routing, finalCommit, errors, warnings) {
+function validateTask(task, routing, finalCommit, errors, warnings, context) {
   if (task.needs_manual_routing === true) {
     addError(errors, 'task.needs_manual_routing',
       'routing migrated to schema 2 is incomplete; a human must fill task.routing and every '
@@ -641,7 +869,7 @@ function validateTask(task, routing, finalCommit, errors, warnings) {
       addError(errors, 'task.model_plan.schema', 'requires routing schema_version 2 in model-routing.yaml');
       return;
     }
-    validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings);
+    validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings, context);
     return;
   }
   validateTaskV1(task, routing, riskLevel, finalCommit, errors);
@@ -740,7 +968,7 @@ function validateTaskV1(task, routing, riskLevel, finalCommit, errors) {
   }
 }
 
-function validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings) {
+function validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings, context) {
   const plan = task.model_plan;
   validateIdentity(errors, plan.created_by, 'task.model_plan.created_by');
 
@@ -912,6 +1140,10 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings)
         requireKnown: riskLevel === 'R3',
       });
       validateExecutionSlot(errors, entry, field, plan.tester, 'tester');
+      validateRunEvidence(entry, field, {
+        taskId: task.id, role: 'tester', runtimeRoot: context.runtimeRoot,
+        declaredAt: entry.tested_at, countsForGate: testRequired,
+      }, errors, warnings);
       passedFinalTests += 1;
       passedFinalTestModels.add(entry.model);
     });
@@ -951,6 +1183,10 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings)
       requireKnown: riskLevel === 'R3',
     });
     validateExecutionSlot(errors, review, field, plan.reviewer, 'reviewer');
+    validateRunEvidence(review, field, {
+      taskId: task.id, role: 'reviewer', runtimeRoot: context.runtimeRoot,
+      declaredAt: review.reviewed_at, countsForGate: reviewRequired,
+    }, errors, warnings);
     // Quem testou nao revisa: o mesmo modelo assinando o teste que passou e a
     // aprovacao do mesmo commit nao acrescenta independencia nenhuma.
     if (passedFinalTestModels.has(review.model)) {
@@ -984,7 +1220,7 @@ function resolveFinalCommit(override) {
   }
 }
 
-export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing.yaml', finalCommit }) {
+export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing.yaml', finalCommit, allowReplan = false, runtimeRoot = null }) {
   const errors = [];
   const warnings = [];
   let routing;
@@ -1007,7 +1243,10 @@ export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing
   } catch (error) {
     return { valid: false, errors: [error.message], warnings };
   }
-  validateTask(task, routing, resolvedFinalCommit, errors, warnings);
+  validateTask(task, routing, resolvedFinalCommit, errors, warnings, {
+    runtimeRoot: resolveRuntimeRoot(runtimeRoot, taskPath),
+  });
+  validatePlanWitness(task, taskPath, 'task.model_plan', errors, warnings, { allowReplan });
   return { valid: errors.length === 0, errors, warnings, finalCommit: resolvedFinalCommit };
 }
 

@@ -30,7 +30,7 @@ model_plan:
       model: model-economical
       effort: low
     alt3:
-      model: model-economical
+      model: model-lateral
       effort: low
     upgrade_alt1:
       model: model-tester

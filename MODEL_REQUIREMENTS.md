@@ -72,6 +72,21 @@ Cada papel roteado guarda até seis opções, cada uma com o seu esforço:
 | `upgrade_alt1`, `upgrade_alt2` | escalada **vertical**: só depois de esgotar o rework ou quando a tarefa se revelar materialmente maior |
 
 Um upgrade nunca pode resolver para um perfil mais fraco que o `default`.
+`alt3` é opcional: um plano sem ele segue válido. Duas laterais com o mesmo
+modelo e o mesmo esforço não são duas alternativas — a mesma cota esgotada
+derruba as duas.
+
+Nenhum modelo pode ocupar dois papéis do mesmo plano. Repetir dentro de um papel
+é permitido; atravessar papéis não, porque abre a porta para o mesmo modelo
+executar e depois avalizar o próprio trabalho. Pela mesma razão, quem assinou o
+teste que passou no commit final não assina a revisão dele.
+
+O plano é congelado ao ser escrito, com
+`validate-task <task> --write-plan-hash`, que grava `model_plan.plan_hash`.
+Editar um slot depois disso é replanejar, e replanejar é decisão do humano. O
+validador confere o congelamento contra o histórico do git, não só contra o
+campo: a referência é a última versão do arquivo commitada antes de a execução
+ser registrada. Regravar o hash não contorna, porque a comparação é de conteúdo.
 
 As recomendações do projeto por tipo de trabalho vivem em `work_routes`. Elas
 selecionam modelos **dentro** do piso definido por `routes`, e nunca podem

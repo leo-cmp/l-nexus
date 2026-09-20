@@ -44,16 +44,23 @@ Perfis representam capacidade esperada, nao fornecedores fixos:
 ## Slots e Effort (schema 2)
 
 `modelo + effort` e a unidade real de execucao. Cada papel roteado guarda ate
-cinco slots, cada um com seu proprio effort:
+seis slots, cada um com seu proprio effort:
 
 | Slot | Significado |
 |---|---|
 | `default` | preferencia normal |
-| `alt1`, `alt2` | alternativas LATERAIS: indisponibilidade, rate limit, custo, provedor, especializacao, restricao de runtime, preferencia humana |
+| `alt1`, `alt2`, `alt3` | alternativas LATERAIS: indisponibilidade, rate limit, custo, provedor, especializacao, restricao de runtime, preferencia humana |
 | `upgrade_alt1`, `upgrade_alt2` | escalada VERTICAL: so apos esgotar rework ou quando a tarefa se revelou materialmente maior |
 
-`alt1`/`alt2` nao significam "o default falhou". Efforts permitidos: `default`,
-`low`, `high`, `max` — nao invente outros nomes.
+`alt1`/`alt2`/`alt3` nao significam "o default falhou". `alt3` fecha a fila
+lateral e e o lugar do modelo de cota curta: entra por ultimo sem ocupar degrau
+de alternativa farta. E opcional — um plano sem `alt3` segue valido.
+
+Duas laterais com o mesmo modelo e o mesmo effort nao sao duas alternativas.
+Se `alt2` repete `alt1`, a mesma cota esgotada derruba as duas e o papel fica
+sem saida.
+
+Efforts permitidos: `default`, `low`, `high`, `max` — nao invente outros nomes.
 
 O Planner escolhe e PERSISTE esses slots na task; a partir dai a task e o
 contrato. `work_routes` no `.ai/model-routing.yaml` guarda as recomendacoes do
@@ -76,15 +83,45 @@ e o que torna o modelo elegivel para o perfil exigido, bloqueie.
 - Em R3, executor e revisor devem usar modelos diferentes. Quando
   `project_policy.r3_cross_provider` for `true`, os provedores tambem devem ser
   diferentes.
+- Um modelo nao pode aparecer em dois papeis do mesmo `model_plan`. Repetir
+  dentro de um papel e permitido; atravessar papeis nao. Se o mesmo modelo pode
+  cair como executor e como revisor, mais cedo ou mais tarde ele revisa o
+  proprio trabalho e o gate vira assinatura.
+- Quem assinou o teste que passou no commit final nao assina a revisao dele. Um
+  modelo que ja disse "passou" nao acrescenta independencia nenhuma ao dizer
+  "aprovado".
+- Quando todo slot de um papel de gate resolve para o mesmo provedor, o papel
+  nao tem alternativa legitima: uma cota esgotada deixa o agente sem saida, e
+  agente sem saida fabrica uma. O validador avisa; o Planner corrige na origem.
 - A revisao deve apontar para o commit final avaliado. Commit de codigo posterior
   torna o parecer anterior obsoleto.
 - Parecer de modelo nunca substitui build, testes, analise estatica, testes de
   integracao ou validacao humana de dominio.
 
+## Plano Congelado
+
+O `model_plan` e o contrato, e contrato que o ator medido pode reescrever nao e
+contrato. Por isso o bloco carrega `model_plan.plan_hash`: sha256 da
+serializacao canonica do proprio bloco, sem o campo do hash.
+
+- Quem cria a task congela o plano ao final da criacao:
+  `validate-task <caminho-da-task> --write-plan-hash`.
+- Plano sem `plan_hash` valida com aviso, para nao quebrar task antiga.
+- Plano com `plan_hash` divergente e erro: prova que o bloco mudou depois de
+  congelado.
+- Acrescentar, remover ou editar um slot depois disso e replanejar, e
+  replanejar exige o humano. Regravar o hash para acomodar a propria edicao e
+  fraude, nao correcao — e nao funciona: o validador compara o plano atual com a
+  ultima versao do arquivo commitada ANTES de a execucao ser registrada. O hash
+  mora no mesmo arquivo que ele protege; o historico, nao.
+- Enquanto nenhum executor estiver registrado, corrigir o plano e livre. Depois
+  do primeiro registro de execucao, o plano e contrato em vigor.
+
 ## Registro na Task
 
 - O criador preenche `model_plan.created_by`, os perfis exigidos, todos os slots
-  com seus efforts, a politica de teste/revisao e o `routing_rationale`.
+  com seus efforts, a politica de teste/revisao e o `routing_rationale`, e
+  congela o bloco com `--write-plan-hash`.
 - O executor preenche `model_execution.executor` antes de modificar codigo,
   incluindo `selection` (qual slot foi usado), `effort` e `runner`.
 - Quando a execucao for coordenada, o orquestrador registra a propria identidade
@@ -92,6 +129,11 @@ e o que torna o modelo elegivel para o perfil exigido, bloqueie.
   o catalogo, porque qualquer runtime pode orquestrar.
 - Cada revisor adiciona uma entrada em `model_execution.reviews` com agente,
   provedor, modelo, commit, instante, veredito e resumo dos achados.
+- Toda entrada de `tests` e `reviews` traz o `run_id` da execucao que a produziu,
+  quando ela passou pelo `lnx-run.sh`. E o que separa um gate que aconteceu de
+  uma linha escrita: o validador abre o registro daquele run e confere papel,
+  modelo, effort, slot e runner contra o que a entrada afirma. Gate sem `run_id`
+  e aceito com aviso; `run_id` que nao corresponde e erro.
 - Identidade `unknown` nao satisfaz execucao ou revisao R3 por padrao.
 
 ## Saida do Model Router

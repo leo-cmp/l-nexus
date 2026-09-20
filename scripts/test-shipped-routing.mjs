@@ -87,8 +87,8 @@ test('E2E 6 — a review of an earlier commit is stale and cannot close the task
 test('E2E 7 — an R3 review from the executor provider is rejected', () => {
   const result = run({
     task: fixture('e2e-r3-critical.md')
-      .replace('    default: { model: deepseek-v4-1-flash, effort: max }\n    alt1: { model: meta-muse-spark-1-3-contributor, effort: max }',
-        '    default: { model: openai-gpt-5-6-sol, effort: max }\n    alt1: { model: meta-muse-spark-1-3-contributor, effort: max }'),
+      .replace('    default: { model: deepseek-v4-1-flash, effort: max }\n    alt1: { model: openai-gpt-5-6-terra, effort: max }',
+        '    default: { model: openai-gpt-5-6-sol, effort: max }\n    alt1: { model: openai-gpt-5-6-terra, effort: max }'),
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /must differ from the planned executor model/);
@@ -98,9 +98,10 @@ test('E2E 8 — a cheaper tester whose eligibility depends on effort needs an ef
   // openai-gpt-5-6-luna is economical by default and only reaches balanced at
   // high, so an effort-blind runner cannot satisfy the balanced tester floor.
   const task = fixture('e2e-r3-critical.md')
-    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }',
-      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }')
-    .replace('      model: openai-gpt-5-6-terra\n      effort: high', '      model: openai-gpt-5-6-luna\n      effort: high');
+    .replace('    default: { model: xiaomi-mimo-v2-5, effort: high }\n    alt1: { model: alibaba-qwen-3-8-flash, effort: high }',
+      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: alibaba-qwen-3-8-flash, effort: high }')
+    .replace('      agent: opencode\n      provider: xiaomi\n      model: xiaomi-mimo-v2-5\n      effort: high\n      runner: opencode',
+      '      agent: codex\n      provider: openai\n      model: openai-gpt-5-6-luna\n      effort: high\n      runner: codex');
   const result = run({ task });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /runner codex does not apply effort high, but openai-gpt-5-6-luna only reaches balanced above its default variant/);
@@ -108,9 +109,10 @@ test('E2E 8 — a cheaper tester whose eligibility depends on effort needs an ef
 
 test('E2E 9 — the same tester is accepted once the runner declares real effort support', () => {
   const task = fixture('e2e-r3-critical.md')
-    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }',
-      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }')
-    .replace('      model: openai-gpt-5-6-terra\n      effort: high', '      model: openai-gpt-5-6-luna\n      effort: high');
+    .replace('    default: { model: xiaomi-mimo-v2-5, effort: high }\n    alt1: { model: alibaba-qwen-3-8-flash, effort: high }',
+      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: alibaba-qwen-3-8-flash, effort: high }')
+    .replace('      agent: opencode\n      provider: xiaomi\n      model: xiaomi-mimo-v2-5\n      effort: high\n      runner: opencode',
+      '      agent: codex\n      provider: openai\n      model: openai-gpt-5-6-luna\n      effort: high\n      runner: codex');
   // Declaring real support means both the flag and the level mapping.
   const routing = readFileSync(shippedRouting, 'utf8').replace(
     '      # Nao verificado nesta versao da CLI. Deixe false ate confirmar.\n      supported: false\n      argv: []\n      mapping: {}',
@@ -188,8 +190,8 @@ test('E2E 13 — retry budgets from the shipped policy make an endless loop impo
 });
 
 test('E2E 14 — a gate role spread across two providers is not warned about a single source', () => {
-  // tester usa openai + xiaomi e reviewer usa deepseek + meta no fixture: nenhum
-  // dos dois papeis depende de um provedor unico, entao nao ha aviso de beco.
+  // tester usa xiaomi + alibaba e reviewer usa deepseek + openai no fixture:
+  // nenhum dos dois papeis depende de um provedor unico, entao nao ha aviso.
   const result = run({ task: fixture('e2e-r3-critical.md') });
   assert.equal(result.status, 0, result.stderr);
   assert.doesNotMatch(result.stderr, /no fallback if that provider's quota runs out/);
@@ -240,9 +242,17 @@ test('the implementation never hardcodes a model, provider or CLI name', () => {
     'scripts/cli.mjs',
     'src/.agents/scripts/lnx-run.sh',
   ];
+  // Comentario nao acopla nada: ninguem troca de provedor por causa de uma
+  // palavra dentro de `#`. O risco e codigo que DECIDE por nome de modelo, e a
+  // trava fica inteira ai. Antes disso a regra tambem pegava comentario, e o
+  // custo aparecia no lugar errado: explicar por que uma variavel de ambiente
+  // existe sem poder escrever o nome dela deixa o comentario pior justamente
+  // onde ele deveria explicar o porque.
+  const comentario = /^\s*(#|\/\/|\*|\/\*)/;
   const leaks = [];
   for (const relative of implementation) {
     readFileSync(path.join(rootDirectory, relative), 'utf8').split('\n').forEach((line, index) => {
+      if (comentario.test(line)) return;
       if (forbidden.test(line)) leaks.push(`${relative}:${index + 1}: ${line.trim()}`);
     });
   }

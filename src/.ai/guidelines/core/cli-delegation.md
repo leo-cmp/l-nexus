@@ -66,9 +66,90 @@ cli_runners:
       supported: false                         # declare `true` só se a CLI aplica mesmo
       argv: ["--effort", "{effort}"]
       mapping: { low: ..., high: ..., max: ... }
+    observed_model:                            # como descobrir quem atendeu
+      bin: "<comando>"
+      argv: ["{run_dir}"]
 ```
 
-Placeholders: `{prompt}`, `{model}`, `{effort}`.
+Placeholders: `{prompt}`, `{model}`, `{effort}` no runner; `{run_dir}` e
+`{output_log}` no observador.
+
+### Quem atendeu (`observed_model`)
+
+Quem **atendeu** não é necessariamente quem foi **pedido**. Uma CLI com fallback
+troca de modelo sozinha quando o primário está sobrecarregado; um endpoint que
+faz rodízio troca quando a cota acaba. Nos dois casos o registro da task diria o
+modelo pedido, e estaria errado sem ninguém perceber.
+
+Nem toda CLI sabe contar qual foi. Medido em 2026-09-20, com prompt mínimo e
+saída JSON:
+
+| CLI | reporta? | onde |
+|---|---|---|
+| `claude` | sim | `modelUsage.<modelo>.canonicalModel`, com `provider` |
+| `codex` | não | `--json` emite 4 eventos de ciclo de vida, nenhum com modelo |
+| `agy` | não | o JSON traz conversa, status, duração e tokens, sem modelo |
+| `opencode` | não | nenhum campo de model ou provider em nenhum evento |
+
+Um em quatro. Nos outros três, o que o registro afirma sobre o modelo é o que
+foi **pedido** — e isso vale enquanto ninguém ligar fallback na CLI. Se ligar, a
+identidade se perde do mesmo jeito que se perderia atrás de um proxy, só que sem
+painel para conferir depois. Para alternativa direta, a regra é **não ligar
+fallback**: é a diferença entre um modelo desconhecido e um modelo sabido.
+
+Por isso o observador é **opcional e por runner**: o kit define onde a evidência
+mora, a máquina define como obtê-la — e assim o kit não ganha dependência nova
+nem conhecimento sobre CLI nenhuma.
+
+```yaml
+observed_model:
+  bin: "<comando>"
+  argv: ["{run_dir}"]      # tambem aceita {output_log}
+```
+
+O comando imprime, na primeira linha, o modelo que respondeu. O `lnx-run.sh`
+grava isso em `observed-model` no diretório do run, e o `validate-task` recusa a
+entrada cujo modelo declarado não bate com o observado.
+
+### E quem decidiu o esforço (`observed-effort`)
+
+O mesmo problema existe um nível abaixo, só que sem o mesmo remédio: medido
+neste projeto em 2026-09-20, o gateway do proxy tem um seletor — configuração
+de dashboard, não de código — que tanto pode **repassar** o esforço pedido pelo
+cliente quanto **sobrescrevê-lo** com um valor fixo. Esse seletor é invisível
+para o kit e para o registro da task. Uma entrada pode declarar `effort: high`,
+ter rodado de fato em `low`, e nada no YAML acusa.
+
+Por isso o contrato de saída do observador passou a ser de **duas linhas**: a
+primeira continua sendo o modelo; a segunda, opcional, é o nível de esforço
+efetivamente aplicado.
+
+```
+claude-opus-4
+high
+```
+
+Um observador que só sabe reportar o modelo continua funcionando exatamente
+como antes — a segunda linha é opcional, e sem ela o `lnx-run.sh` simplesmente
+não grava `observed-effort`. Quando ela existe e o `entry.effort` está
+declarado, o `validate-task` compara os dois e recusa a divergência, do mesmo
+jeito que já faz para `observed-model`.
+
+Três regras:
+
+- é **best-effort**. Observador que falha não derruba a execução: a ausência da
+  evidência já é a informação, e perder o trabalho do agente por causa dela
+  seria trocar um problema por outro maior;
+- runner que não sabe reportar fica sem observador, e o gate dele vale menos —
+  **diga isso**, não finja equivalência;
+- extrair o modelo costuma exigir que a CLI rode em modo JSON, o que muda o que
+  aparece na tela. Num terminal visível que o humano acompanha, isso é um
+  custo real: pondere entre ver o agente trabalhando e poder provar quem era.
+
+Quando uma entrada do catálogo representa um **conjunto** de modelos, e não um
+modelo só, o perfil declarado é o do membro **mais fraco** — é a única coisa
+verdadeira sobre qualquer resposta que vier de lá. Pela mesma razão, as
+capacidades são a interseção, nunca a união.
 
 ### Abrir em modo interativo
 

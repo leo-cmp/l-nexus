@@ -344,6 +344,113 @@ npx @leo-cmp/l-nexus validate-task \
   --final-commit "$(git rev-parse HEAD)"
 ```
 
+### Plano congelado
+
+Quem escreve a task congela o plano ao terminar:
+
+```bash
+npx @leo-cmp/l-nexus validate-task .planning/PLAN_VN/tasks/task_X_Y.md --write-plan-hash
+```
+
+A flag grava `model_plan.plan_hash`, o sha256 de uma serialização canônica do
+bloco sem o próprio campo. Sem isso, a validação é circular: ela confere a
+execução contra o plano **como o plano está na hora da validação**, e quem
+executa pode editar o plano para caber na própria escolha. Houve caso real —
+cota do revisor esgotada, um slot `alt2` acrescentado ao plano, o rationale
+reescrito para justificá-lo, e o validador aprovando um gate que nunca existiu.
+
+Plano sem `plan_hash` valida com **aviso**, para não quebrar task antiga. Plano
+com `plan_hash` divergente é **erro**. Avisos saem em canal próprio e nunca
+mudam o exit code.
+
+Sozinho, o `plan_hash` seria convenção: quem pode rodar `--write-plan-hash`
+edita o plano, regrava o hash e segue. Por isso o validador também usa **git
+como testemunha**. Ele procura no histórico do arquivo a última versão commitada
+**antes** de a execução ser registrada — o plano como estava quando o trabalho
+começou — e compara com o plano atual. Regravar o hash não ajuda: a comparação é
+de conteúdo, e o histórico não se deixa reescrever sem force-push.
+
+Enquanto nenhum executor foi registrado, replanejar é livre: o Planner corrige o
+plano quantas vezes precisar. Depois disso, divergência é **erro**. Sem
+repositório, sem o arquivo versionado, ou sem nenhuma versão commitada anterior
+ao registro de execução, sai **aviso** — não há testemunho, e fingir que há
+seria pior. Para o humano que replanejou de propósito uma task já em execução,
+`--allow-replan` rebaixa o erro a aviso.
+
+### Independência dos gates
+
+Três regras tornam o gate difícil de encenar, e as três são **erro**:
+
+- um modelo não pode ocupar dois papéis do mesmo `model_plan` — repetir dentro
+  de um papel é permitido, atravessar papéis não;
+- quem assinou o teste que passou no commit final não assina a revisão dele;
+- em R3, revisor diferente do executor e, com `r3_cross_provider`, de outro
+  provedor.
+
+Há ainda um **aviso** quando todos os slots de um papel de gate resolvem para o
+mesmo provedor: o papel não tem alternativa legítima, e foi exatamente assim que
+o caso real começou.
+
+### Prova de ocorrência
+
+As regras acima conferem **forma**: se o registro está bem preenchido, se aponta
+para um slot que existe, se o revisor difere de quem executou. Nenhuma delas
+pergunta se a execução aconteceu — um agente pode escrever `verdict: approved`
+sem jamais ter chamado revisor nenhum.
+
+Quem responde isso é o `lnx-run.sh`. A cada execução delegada ele grava um
+diretório com `meta.json`, `exit-code` e log. Quem escreve esse diretório é o
+script, não o agente medido, e é aí que está a diferença.
+
+Cada entrada de `tests[]` e `reviews[]` pode declarar o `run_id` daquela
+execução. Quando declara, o validador abre o registro e confere que ele existe,
+que é **desta** task (o que pega `run_id` copiado de outra), que papel, modelo,
+effort, slot e runner batem com o que a linha afirma, e que há `exit-code` —
+porque gate fechado por execução que talvez ainda esteja rodando não é gate.
+
+Ausente é **aviso**, e só quando o gate é obrigatório. Divergente é **erro**.
+
+Mentir custava uma linha de YAML; agora custa fabricar uma árvore de arquivos
+com carimbos que o agente não emite.
+
+Há ainda uma camada acima: **quem atendeu não é necessariamente quem foi
+pedido**. Uma CLI com fallback troca de modelo sozinha quando o primário está
+sobrecarregado, e um proxy troca quando a cota acaba. Quando o runner sabe
+reportar o modelo que respondeu, o `lnx-run.sh` grava esse valor e o validador
+recusa a entrada que declara outro. Nem toda CLI sabe: por isso o observador é
+configurável por runner, e um runner sem ele produz gate que vale menos — o que
+deve ser dito, não disfarçado.
+
+**Limite declarado:** `.lnx/` não entra no git, então isso vale na máquina que
+executou — que é onde o gate roda, mas significa que CI não reconfere depois.
+
+### Sincronizar o catálogo com o kit
+
+O `.ai/model-routing.yaml` pertence ao projeto e nunca é sobrescrito: o
+`install` só copia quando ele não existe, e o `migrate-routing` migra schema, não
+conteúdo. O efeito colateral é que **nada propagava catálogo** — já aconteceu de
+um projeto ficar sete modelos à frente do kit, com a sincronização feita à mão.
+
+A causa é que o arquivo mistura quatro donos. `models` é do mundo; `work_routes`,
+`profiles`, `routes` e `execution_policy` são do kit; `project_policy` e
+`risk_domains.project` são do projeto; `cli_runners`, `terminal_runners` e
+`runner_policy` descrevem a máquina. Para proteger as duas últimas categorias,
+congelou-se o arquivo inteiro.
+
+```bash
+npx @leo-cmp/l-nexus sync-routing            # dry-run: diz o que mudaria
+npx @leo-cmp/l-nexus sync-routing --write    # aplica
+```
+
+Ele troca as duas primeiras categorias e não encosta nas outras duas. O dry-run é
+o padrão e resume por chave — quais modelos entram, saem ou mudam — em vez de
+despejar setecentas linhas de diff. Seção local que o kit desconhece fica intacta
+e é anunciada. Schema divergente é recusado com o aviso de rodar o
+`migrate-routing` antes.
+
+Os comentários do kit viajam junto com as seções que ele governa: a
+justificativa de uma rota vale tanto quanto a rota.
+
 Para converter o front matter de uma task legada sem inventar identidades de
 executor ou revisor, simule primeiro e aplique explicitamente:
 
