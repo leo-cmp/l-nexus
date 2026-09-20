@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { readFileSync, writeFileSync } from 'node:fs';
 import process from 'node:process';
 import { parseDocument } from 'yaml';
 
@@ -9,8 +10,17 @@ const SUPPORTED_SCHEMA_VERSIONS = [1, 2];
 const RISK_LEVELS = new Set(['R1', 'R2', 'R3']);
 const COMPLEXITY_LEVELS = new Set(['L1', 'L2', 'L3']);
 const EFFORT_LEVELS = ['default', 'low', 'high', 'max'];
-const ROUTING_SLOTS = ['default', 'alt1', 'alt2', 'upgrade_alt1', 'upgrade_alt2'];
+// alt3 e uma alternativa LATERAL, nao um degrau: fica entre as laterais e os
+// upgrades para que modelos de cota curta possam ser a ultima lateral sem
+// ocupar o lugar que deveria ser de uma alternativa farta. Por isso nao entra
+// em UPGRADE_SLOTS.
+const ROUTING_SLOTS = ['default', 'alt1', 'alt2', 'alt3', 'upgrade_alt1', 'upgrade_alt2'];
 const UPGRADE_SLOTS = ['upgrade_alt1', 'upgrade_alt2'];
+// alt3 e opcional no executor: plans escritos antes dele nao podem quebrar, e o
+// work_routes do catalogo (fora do escopo desta task) nao o declara. Quando
+// presente, ele e validado como qualquer outra lateral.
+const REQUIRED_EXECUTOR_SLOTS = ROUTING_SLOTS.filter((slot) => slot !== 'alt3');
+const ROUTED_ROLES = ['executor', 'tester', 'reviewer'];
 const ORCHESTRATION_MODES = new Set(['manual', 'orchestrated']);
 const ORCHESTRATION_STATES = new Set([
   'pending', 'executing', 'testing', 'reviewing', 'rework',
@@ -26,11 +36,12 @@ const ATTEMPT_BUDGETS = new Map([
 
 function usage() {
   return `Usage:
-  validate-task-routing.mjs <task-path> [--routing <routing-path>] [--final-commit <sha>]
-  l-nexus validate-task <task-path> [--routing <routing-path>] [--final-commit <sha>]
+  validate-task-routing.mjs <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash]
+  l-nexus validate-task <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash]
   l-nexus migrate-task <task-path> [--to 1|2] [--write]
 
-Validates task front matter against model-routing.yaml (schema_version 1 or 2).`;
+Validates task front matter against model-routing.yaml (schema_version 1 or 2).
+--write-plan-hash freezes task.model_plan by recording its plan_hash and exits.`;
 }
 
 function parseArguments(argv) {
@@ -38,9 +49,18 @@ function parseArguments(argv) {
   if (args[0] === 'validate-task') args.shift();
   if (args.includes('--help') || args.includes('-h')) return { help: true };
 
-  const options = { taskPath: null, routingPath: '.ai/model-routing.yaml', finalCommit: null };
+  const options = {
+    taskPath: null,
+    routingPath: '.ai/model-routing.yaml',
+    finalCommit: null,
+    writePlanHash: false,
+  };
   while (args.length > 0) {
     const value = args.shift();
+    if (value === '--write-plan-hash') {
+      options.writePlanHash = true;
+      continue;
+    }
     if (value === '--routing' || value === '--final-commit') {
       const optionValue = args.shift();
       if (!optionValue) throw new Error(`cli.${value}: requires a value`);
@@ -64,6 +84,13 @@ function addError(errors, field, message) {
   errors.push(`${field}: ${message}`);
 }
 
+// Avisos usam o mesmo formato dos erros, mas em canal proprio para nunca
+// alterar o exit code. Um aviso e um risco conhecido que o projeto aceita; um
+// erro e uma violacao do contrato.
+function addWarning(warnings, field, message) {
+  warnings.push(`${field}: ${message}`);
+}
+
 function parseYaml(text, source) {
   const document = parseDocument(text, { prettyErrors: false });
   if (document.errors.length > 0) {
@@ -79,6 +106,89 @@ function parseTaskFrontMatter(text, source) {
   const match = normalized.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
   if (!match) throw new Error(`${source}: expected YAML front matter delimited by ---`);
   return parseYaml(match[1], `${source} front matter`);
+}
+
+// Serializacao canonica usada pelo plan_hash: JSON com as chaves de todo
+// objeto ordenadas recursivamente e sem espacos. Quem gerar o hash fora do
+// validador precisa reproduzir exatamente esta regra, senao o plano nunca
+// valida por mais correto que esteja. Strings seguem o escape do JSON.stringify.
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(',')}]`;
+  if (isObject(value)) {
+    const keys = Object.keys(value).sort();
+    return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
+  }
+  if (value === undefined) return 'null';
+  return JSON.stringify(value);
+}
+
+// Hash do bloco model_plan inteiro, menos o proprio plan_hash. Congelar o plano
+// quebra a checagem circular: o ator medido nao pode acrescentar um slot, reescrever
+// a justificativa e ainda ser aprovado contra o plano que ele mesmo editou.
+function computePlanHash(plan) {
+  const frozen = { ...plan };
+  delete frozen.plan_hash;
+  return createHash('sha256').update(canonicalJson(frozen), 'utf8').digest('hex');
+}
+
+// Sem plan_hash o plano nao esta congelado, mas tasks antigas nao podem quebrar:
+// por isso a ausencia e aviso, nunca erro. Um hash presente e divergente e erro,
+// porque prova que o bloco foi editado depois de congelado.
+function validatePlanHash(plan, field, errors, warnings) {
+  if (!isObject(plan)) return;
+  if (plan.plan_hash === undefined || plan.plan_hash === null) {
+    addWarning(warnings, `${field}.plan_hash`,
+      'model_plan is not frozen; run validate-task <task> --write-plan-hash to record it');
+    return;
+  }
+  if (typeof plan.plan_hash !== 'string' || plan.plan_hash.trim() === '') {
+    addError(errors, `${field}.plan_hash`, 'must be a non-empty sha256 hex string');
+    return;
+  }
+  const expected = computePlanHash(plan);
+  if (plan.plan_hash.trim().toLowerCase() !== expected) {
+    addError(errors, `${field}.plan_hash`, `does not match the model plan contents (expected ${expected})`);
+  }
+}
+
+// Compara commits por prefixo de SHA: um SHA curto e o SHA completo do mesmo
+// commit. A igualdade estrita fazia o bloco de revisao ser PULADO em silencio e
+// o comando ainda imprimia "validation passed". Dois SHAs batem quando um e
+// prefixo do outro, com no minimo 7 caracteres hexadecimais.
+function commitMatches(recorded, expected) {
+  if (typeof recorded !== 'string' || typeof expected !== 'string') return false;
+  const left = recorded.trim().toLowerCase();
+  const right = expected.trim().toLowerCase();
+  if (left.length < 7 || right.length < 7) return false;
+  if (!/^[0-9a-f]+$/.test(left) || !/^[0-9a-f]+$/.test(right)) return false;
+  return left.startsWith(right) || right.startsWith(left);
+}
+
+// Grava plan_hash no arquivo da task, preservando o restante do front matter.
+// Sem esta flag o Planner nao tem como emitir o valor, e toda task ficaria
+// eternamente apenas avisada de que o plano nao esta congelado.
+function writePlanHash(taskPath) {
+  const contents = readFileSync(taskPath, 'utf8');
+  const normalized = contents.replace(/^\uFEFF/, '');
+  const bom = contents.startsWith('\uFEFF') ? '\uFEFF' : '';
+  const match = normalized.match(/^---(\r?\n)([\s\S]*?)\r?\n---(\r?\n|$)/);
+  if (!match) throw new Error(`${taskPath}: expected YAML front matter delimited by ---`);
+  const newline = match[1];
+  const closing = match[3];
+  const document = parseDocument(match[2], { prettyErrors: false, keepSourceTokens: true });
+  if (document.errors.length > 0) {
+    throw new Error(`${taskPath}: invalid YAML: ${document.errors.map((error) => error.message).join('; ')}`);
+  }
+  const value = document.toJS();
+  if (!isObject(value) || !isObject(value.model_plan)) {
+    throw new Error(`${taskPath}: expected a model_plan mapping to freeze`);
+  }
+  const hash = computePlanHash(value.model_plan);
+  document.setIn(['model_plan', 'plan_hash'], hash);
+  const frontMatter = document.toString({ lineWidth: 0 }).trimEnd().replaceAll('\n', newline);
+  const body = normalized.slice(match[0].length);
+  writeFileSync(taskPath, `${bom}---${newline}${frontMatter}${newline}---${closing}${body}`, 'utf8');
+  return hash;
 }
 
 function valueIsKnown(value) {
@@ -351,7 +461,53 @@ function validateRoutedRole(errors, plan, roleName, routing, riskLevel, options)
       }
     }
   }
+
+  validateGateRoleProviderDiversity(options.warnings, plan, roleName, field, routing);
   return plan;
+}
+
+// Um papel de gate com todos os slots no mesmo provedor nao tem saida quando a
+// cota daquele provedor esgota: foi a causa raiz do caso em que o Orchestrator
+// editou o proprio plano para se desbloquear. E aviso, nao erro, porque o projeto
+// pode aceitar o risco desde que saiba que ele existe.
+function validateGateRoleProviderDiversity(warnings, plan, roleName, field, routing) {
+  if (!['tester', 'reviewer'].includes(roleName)) return;
+  const providers = new Set();
+  let declaredSlots = 0;
+  for (const slot of ROUTING_SLOTS) {
+    const value = plan[slot];
+    if (!isObject(value)) continue;
+    const provider = routing.models?.[value.model]?.provider;
+    if (typeof provider !== 'string' || provider.trim() === '') continue;
+    declaredSlots += 1;
+    providers.add(provider);
+  }
+  if (declaredSlots > 1 && providers.size === 1) {
+    addWarning(warnings, field,
+      `every ${roleName} slot resolves to provider ${[...providers][0]}; the role has no fallback if that provider's quota runs out`);
+  }
+}
+
+// Um modelo declarado em papeis diferentes (executor, tester, reviewer) e erro
+// ja no plano. Se ele pode cair em dois papeis, mais cedo ou mais tarde testa e
+// revisa o proprio trabalho, e o gate vira carimbo.
+function validateRoleModelDisjointness(errors, plan) {
+  const modelRoles = new Map();
+  for (const roleName of ROUTED_ROLES) {
+    const rolePlan = plan?.[roleName];
+    if (!isObject(rolePlan)) continue;
+    for (const slot of ROUTING_SLOTS) {
+      const value = rolePlan[slot];
+      if (!isObject(value) || typeof value.model !== 'string' || value.model.trim() === '') continue;
+      const owner = modelRoles.get(value.model);
+      if (owner === undefined) {
+        modelRoles.set(value.model, roleName);
+      } else if (owner !== roleName) {
+        addError(errors, `task.model_plan.${roleName}.${slot}.model`,
+          `${value.model} is already planned for the ${owner} role; a model must not serve two roles`);
+      }
+    }
+  }
 }
 
 function routingCapabilities(taskRouting) {
@@ -439,7 +595,7 @@ function validateExecutionIdentityV2(errors, record, field, routing, requiredPro
   validateRunnerEffortSupport(errors, record, field, routing, requiredProfile);
 }
 
-function validateTask(task, routing, finalCommit, errors) {
+function validateTask(task, routing, finalCommit, errors, warnings) {
   if (task.needs_manual_routing === true) {
     addError(errors, 'task.needs_manual_routing',
       'routing migrated to schema 2 is incomplete; a human must fill task.routing and every '
@@ -479,12 +635,13 @@ function validateTask(task, routing, finalCommit, errors) {
     addError(errors, 'task.model_plan.schema', 'must be 2 when present; omit it for legacy schema 1 tasks');
     return;
   }
+  validatePlanHash(task.model_plan, 'task.model_plan', errors, warnings);
   if (planSchema === 2) {
     if (routing.schema_version !== 2) {
       addError(errors, 'task.model_plan.schema', 'requires routing schema_version 2 in model-routing.yaml');
       return;
     }
-    validateTaskV2(task, routing, riskLevel, finalCommit, errors);
+    validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings);
     return;
   }
   validateTaskV1(task, routing, riskLevel, finalCommit, errors);
@@ -550,7 +707,7 @@ function validateTaskV1(task, routing, riskLevel, finalCommit, errors) {
       if (typeof review.findings !== 'string' || review.findings.trim() === '') {
         addError(errors, `${field}.findings`, 'must explicitly summarize findings or state no findings');
       }
-      if (review.commit === finalCommit) {
+      if (commitMatches(review.commit, finalCommit)) {
         validateCatalogModel(errors, review, field, routing, routing.routes?.[riskLevel]?.reviewer_profile);
         approvedFinalReviews.push({ review, field });
       }
@@ -583,7 +740,7 @@ function validateTaskV1(task, routing, riskLevel, finalCommit, errors) {
   }
 }
 
-function validateTaskV2(task, routing, riskLevel, finalCommit, errors) {
+function validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings) {
   const plan = task.model_plan;
   validateIdentity(errors, plan.created_by, 'task.model_plan.created_by');
 
@@ -613,19 +770,27 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors) {
 
   validateRoutedRole(errors, plan.executor, 'executor', routing, riskLevel, {
     routeProfileKey: 'executor_profile',
-    requiredSlots: ROUTING_SLOTS,
+    requiredSlots: REQUIRED_EXECUTOR_SLOTS,
     taskRouting: task.routing,
+    warnings,
   });
   validateRoutedRole(errors, plan.tester, 'tester', routing, riskLevel, {
     routeProfileKey: 'tester_profile',
     requiredSlots: ['default'],
     taskRouting: task.routing,
+    warnings,
   });
   validateRoutedRole(errors, plan.reviewer, 'reviewer', routing, riskLevel, {
     routeProfileKey: 'reviewer_profile',
     requiredSlots: ['default'],
     taskRouting: task.routing,
+    warnings,
   });
+
+  // Um mesmo modelo em dois papeis diferentes permite que ele teste e revise o
+  // proprio trabalho, e o gate vira carimbo. Dentro do mesmo papel a repeticao
+  // e legitima, porque a diferenca ali costuma ser o esforco.
+  validateRoleModelDisjointness(errors, plan);
 
   if (isObject(plan.tester) && plan.tester.required !== testRequired) {
     addError(errors, 'task.model_plan.tester.required', `must be ${testRequired} for ${riskLevel}`);
@@ -722,6 +887,7 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors) {
 
   const tests = task.model_execution.tests;
   let passedFinalTests = 0;
+  const passedFinalTestModels = new Set();
   if (!Array.isArray(tests)) {
     addError(errors, 'task.model_execution.tests', 'must be an array');
   } else {
@@ -741,12 +907,13 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors) {
         addError(errors, `${field}.verdict`, `must be one of ${[...TEST_VERDICTS].join(', ')}`);
         return;
       }
-      if (entry.verdict !== 'passed' || entry.commit !== finalCommit) return;
+      if (entry.verdict !== 'passed' || !commitMatches(entry.commit, finalCommit)) return;
       validateExecutionIdentityV2(errors, entry, field, routing, route.tester_profile ?? plan.tester?.required_profile, {
         requireKnown: riskLevel === 'R3',
       });
       validateExecutionSlot(errors, entry, field, plan.tester, 'tester');
       passedFinalTests += 1;
+      passedFinalTestModels.add(entry.model);
     });
   }
   if (testRequired && passedFinalTests === 0) {
@@ -779,11 +946,16 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors) {
     if (typeof review.findings !== 'string' || review.findings.trim() === '') {
       addError(errors, `${field}.findings`, 'must explicitly summarize findings or state no findings');
     }
-    if (review.commit !== finalCommit) return;
+    if (!commitMatches(review.commit, finalCommit)) return;
     validateExecutionIdentityV2(errors, review, field, routing, route.reviewer_profile ?? plan.reviewer?.required_profile, {
       requireKnown: riskLevel === 'R3',
     });
     validateExecutionSlot(errors, review, field, plan.reviewer, 'reviewer');
+    // Quem testou nao revisa: o mesmo modelo assinando o teste que passou e a
+    // aprovacao do mesmo commit nao acrescenta independencia nenhuma.
+    if (passedFinalTestModels.has(review.model)) {
+      addError(errors, field, `must not be approved by the same model that passed the final test (${review.model})`);
+    }
     approvedFinalReviews.push(review);
   });
 
@@ -814,28 +986,29 @@ function resolveFinalCommit(override) {
 
 export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing.yaml', finalCommit }) {
   const errors = [];
+  const warnings = [];
   let routing;
   let task;
   try {
     routing = parseYaml(readFileSync(routingPath, 'utf8'), routingPath);
   } catch (error) {
-    return { valid: false, errors: [error.message] };
+    return { valid: false, errors: [error.message], warnings };
   }
   validateRouting(routing, errors);
-  if (errors.length > 0) return { valid: false, errors };
+  if (errors.length > 0) return { valid: false, errors, warnings };
   try {
     task = parseTaskFrontMatter(readFileSync(taskPath, 'utf8'), taskPath);
   } catch (error) {
-    return { valid: false, errors: [error.message] };
+    return { valid: false, errors: [error.message], warnings };
   }
   let resolvedFinalCommit;
   try {
     resolvedFinalCommit = resolveFinalCommit(finalCommit);
   } catch (error) {
-    return { valid: false, errors: [error.message] };
+    return { valid: false, errors: [error.message], warnings };
   }
-  validateTask(task, routing, resolvedFinalCommit, errors);
-  return { valid: errors.length === 0, errors, finalCommit: resolvedFinalCommit };
+  validateTask(task, routing, resolvedFinalCommit, errors, warnings);
+  return { valid: errors.length === 0, errors, warnings, finalCommit: resolvedFinalCommit };
 }
 
 function main() {
@@ -846,6 +1019,11 @@ function main() {
       console.log(usage());
       return;
     }
+    if (options.writePlanHash) {
+      const hash = writePlanHash(options.taskPath);
+      console.log(`Wrote plan_hash ${hash} to ${options.taskPath}.`);
+      return;
+    }
     const result = validateTaskRouting(options);
     if (!result.valid) {
       console.error('Task routing validation failed:');
@@ -853,6 +1031,9 @@ function main() {
       process.exitCode = 1;
       return;
     }
+    // Avisos vao para stderr e nunca mudam o exit code: sao riscos conhecidos,
+    // nao violacoes do contrato.
+    for (const warning of result.warnings) console.error(`warning: ${warning}`);
     console.log(`Task routing validation passed for final commit ${result.finalCommit}.`);
   } catch (error) {
     console.error(`Task routing validation failed: ${error.message}`);

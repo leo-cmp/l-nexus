@@ -24,18 +24,19 @@ model_plan:
     default: { model: anthropic-haiku-4-5, effort: default }
     alt1: { model: openai-gpt-5-6-luna, effort: default }
     alt2: { model: google-gemini-3-7-flash, effort: default }
+    alt3: { model: tencent-hy3, effort: default }
     upgrade_alt1: { model: openai-gpt-5-6-terra, effort: high }
     upgrade_alt2: { model: anthropic-sonnet-5, effort: high }
   tester:
     required: false
     required_profile: economical
-    default: { model: openai-gpt-5-6-luna, effort: default }
+    default: { model: xiaomi-mimo-v2-5, effort: default }
   reviewer:
     required: false
     required_profile: economical
     independent_model: false
     cross_provider_required: false
-    default: { model: google-gemini-3-7-flash, effort: default }
+    default: { model: zhipu-glm-5-3-flash, effort: default }
 routing_rationale:
   executor: Copy local em um arquivo nao exige mais que capacidade economica.
   tester: R1 nao tem gate de teste obrigatorio neste projeto.

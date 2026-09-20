@@ -18,7 +18,7 @@ npx @leo-cmp/l-nexus install
 | **Subagentes** | Templates e protocolo de isolamento para research, coder, reviewer e qa-tester |
 | **Guidelines** | Regras centrais, delegação por terminal CLI e práticas específicas de stacks |
 | **Templates** | plan.md, task.md, task-short.md, issue-local.md |
-| **Roteamento & CLI Delegation** | Complexidade L1-L3, risco R1-R3, slots `default/alt1/alt2/upgrade_alt1/upgrade_alt2` com effort, runners configuráveis e revisão independente |
+| **Roteamento & CLI Delegation** | Complexidade L1-L3, risco R1-R3, slots `default/alt1/alt2/alt3/upgrade_alt1/upgrade_alt2` com effort, runners configuráveis e revisão independente |
 | **Orquestração multi-LLM** | Role `orchestrator` + skill `lnx-orchestrator`: delega executor, tester e reviewer em **terminais visíveis**, coleta resultados estruturados e aplica gates de rework/upgrade |
 | **MCP** | context7, github, sequential-thinking, chrome-devtools, daisyui-github, nudge |
 | **Circuit breakers** | Max 5 skills/sessão, max 3 tentativas/critério, max 10 arquivos/task, loop detection |
@@ -245,7 +245,7 @@ aplica, para tester e reviewer):
 | Slot | Significado |
 |---|---|
 | `default` | preferência normal |
-| `alt1`, `alt2` | alternativas **laterais**: indisponibilidade, rate limit, custo, provedor, especialização, preferência humana — **não** são retry |
+| `alt1`, `alt2`, `alt3` | alternativas **laterais**: indisponibilidade, rate limit, custo, provedor, especialização, preferência humana — **não** são retry; `alt3` fecha a fila lateral, para modelos de cota curta |
 | `upgrade_alt1`, `upgrade_alt2` | escalada **vertical**: só depois de esgotar o rework ou quando a tarefa se revelar materialmente maior |
 
 Cada slot carrega seu próprio `effort` (`default`, `low`, `high`, `max`), porque

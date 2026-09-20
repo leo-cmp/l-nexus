@@ -87,8 +87,8 @@ test('E2E 6 — a review of an earlier commit is stale and cannot close the task
 test('E2E 7 — an R3 review from the executor provider is rejected', () => {
   const result = run({
     task: fixture('e2e-r3-critical.md')
-      .replace('    default: { model: anthropic-opus-5, effort: max }\n    alt1: { model: deepseek-v4-1-flash, effort: max }',
-        '    default: { model: openai-gpt-5-6-sol, effort: max }\n    alt1: { model: deepseek-v4-1-flash, effort: max }'),
+      .replace('    default: { model: deepseek-v4-1-flash, effort: max }\n    alt1: { model: meta-muse-spark-1-3-contributor, effort: max }',
+        '    default: { model: openai-gpt-5-6-sol, effort: max }\n    alt1: { model: meta-muse-spark-1-3-contributor, effort: max }'),
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /must differ from the planned executor model/);
@@ -98,8 +98,8 @@ test('E2E 8 — a cheaper tester whose eligibility depends on effort needs an ef
   // openai-gpt-5-6-luna is economical by default and only reaches balanced at
   // high, so an effort-blind runner cannot satisfy the balanced tester floor.
   const task = fixture('e2e-r3-critical.md')
-    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }',
-      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }')
+    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }',
+      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }')
     .replace('      model: openai-gpt-5-6-terra\n      effort: high', '      model: openai-gpt-5-6-luna\n      effort: high');
   const result = run({ task });
   assert.notEqual(result.status, 0);
@@ -108,8 +108,8 @@ test('E2E 8 — a cheaper tester whose eligibility depends on effort needs an ef
 
 test('E2E 9 — the same tester is accepted once the runner declares real effort support', () => {
   const task = fixture('e2e-r3-critical.md')
-    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }',
-      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }')
+    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }',
+      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: xiaomi-mimo-v2-5, effort: high }')
     .replace('      model: openai-gpt-5-6-terra\n      effort: high', '      model: openai-gpt-5-6-luna\n      effort: high');
   // Declaring real support means both the flag and the level mapping.
   const routing = readFileSync(shippedRouting, 'utf8').replace(
@@ -165,12 +165,7 @@ test('E2E 11 — a task that finished on an upgrade slot records that slot', () 
     .replace('    selection: default\n    agent: codex\n    provider: openai\n    model: openai-gpt-5-6-sol\n    effort: max\n    runner: codex',
       '    selection: upgrade_alt1\n    agent: claude-code\n    provider: anthropic\n    model: anthropic-opus-5\n    effort: max\n    runner: claude')
     .replace('  attempts: { executor: 2, reworks: 1, upgrades: 0 }', '  attempts: { executor: 3, reworks: 1, upgrades: 1 }')
-    .replace('    attempts: 2', '    attempts: 3')
-    // The reviewer must stay independent of the model that actually executed.
-    .replace('    default: { model: anthropic-opus-5, effort: max }\n    alt1: { model: deepseek-v4-1-flash, effort: max }',
-      '    default: { model: deepseek-v4-1-flash, effort: max }\n    alt1: { model: anthropic-opus-5, effort: max }')
-    .replace('      agent: claude-code\n      provider: anthropic\n      model: anthropic-opus-5\n      effort: max\n      runner: claude',
-      '      agent: opencode\n      provider: deepseek\n      model: deepseek-v4-1-flash\n      effort: max\n      runner: opencode');
+    .replace('    attempts: 2', '    attempts: 3');
   const result = run({ task });
   assert.equal(result.status, 0, result.stderr);
 });
@@ -190,6 +185,14 @@ test('E2E 13 — retry budgets from the shipped policy make an endless loop impo
   assert.match(result.stderr, /attempts\.executor: must not exceed execution_policy\.max_total_execution_attempts \(3\)/);
   assert.match(result.stderr, /attempts\.reworks: must not exceed execution_policy\.max_same_executor_reworks \(1\)/);
   assert.match(result.stderr, /attempts\.upgrades: must not exceed execution_policy\.max_upgrades \(1\)/);
+});
+
+test('E2E 14 — a gate role spread across two providers is not warned about a single source', () => {
+  // tester usa openai + xiaomi e reviewer usa deepseek + meta no fixture: nenhum
+  // dos dois papeis depende de um provedor unico, entao nao ha aviso de beco.
+  const result = run({ task: fixture('e2e-r3-critical.md') });
+  assert.equal(result.status, 0, result.stderr);
+  assert.doesNotMatch(result.stderr, /no fallback if that provider's quota runs out/);
 });
 
 test('every runner declares interactive and autonomy support explicitly', () => {
