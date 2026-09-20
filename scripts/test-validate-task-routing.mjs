@@ -317,6 +317,23 @@ test('accepts a slot model retired after the task closed, and says so in a warni
   });
 });
 
+// O aviso e inutil se so aparece quando a task passa: uma task reprovada e
+// exatamente a que alguem foi ler para entender o motivo. Este teste mistura os
+// dois -- um erro de verdade e um aviso de aposentadoria -- e exige ver os dois
+// na mesma saida.
+test('prints warnings even when the task fails validation', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task
+    .replace(
+      '    alt1:\n      model: model-variant\n      effort: high',
+      '    alt1:\n      model: model-retired\n      effort: high',
+    )
+    .replace('      verdict: approved', '      verdict: rejected'), (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /requires an approved review of final commit abc1234/);
+    assert.match(result.stderr, /warning: task\.model_plan\.executor\.alt1\.model: model-retired is deprecated, not active, in the catalog; it was retired after this task closed/);
+  });
+});
+
 // A flexibilizacao vale so para o status. Um modelo que nao esta no catalogo
 // continua erro numa task fechada: aposentado e um modelo que foi avaliado e
 // envelheceu, e desconhecido e um modelo sobre o qual o projeto nunca soube

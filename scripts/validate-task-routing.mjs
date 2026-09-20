@@ -1294,15 +1294,18 @@ function main() {
       return;
     }
     const result = validateTaskRouting(options);
+    // Avisos vao para stderr e nunca mudam o exit code: sao riscos conhecidos,
+    // nao violacoes do contrato. Saem antes do veredito, e tambem no caminho de
+    // falha, porque o aviso costuma ser o contexto que explica por que a task
+    // esta naquele estado -- cala-lo justo quando ela reprova esconde a
+    // explicacao de quem foi ler o motivo.
+    for (const warning of result.warnings) console.error(`warning: ${warning}`);
     if (!result.valid) {
       console.error('Task routing validation failed:');
       for (const error of result.errors) console.error(`- ${error}`);
       process.exitCode = 1;
       return;
     }
-    // Avisos vao para stderr e nunca mudam o exit code: sao riscos conhecidos,
-    // nao violacoes do contrato.
-    for (const warning of result.warnings) console.error(`warning: ${warning}`);
     console.log(`Task routing validation passed for final commit ${result.finalCommit}.`);
   } catch (error) {
     console.error(`Task routing validation failed: ${error.message}`);
