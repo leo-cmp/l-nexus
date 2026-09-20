@@ -42,14 +42,21 @@ if [ -z "$(echo "$COMMITS" | tr -d '[:space:]')" ]; then
 	exit 0
 fi
 
-if echo "$COMMITS" | grep -q "BREAKING CHANGE:"; then
+# `grep -q` sai no primeiro match e fecha o pipe; com o log grande, o `echo` do
+# outro lado ainda esta escrevendo e morre de SIGPIPE (141). Com `set -o
+# pipefail` o pipeline inteiro vira 141, e a condicao e lida como FALSA apesar
+# de ter havido match -- o release caia no `none` e anunciava "nada releasable".
+# Dependia do tamanho: passava com poucos commits e quebrava com muitos, que e a
+# pior forma de quebrar. Herestring nao e pipeline, entao a saida antecipada do
+# grep nao derruba nada.
+if grep -q "BREAKING CHANGE:" <<< "$COMMITS"; then
 	BUMP=major
-elif echo "$COMMITS" | grep -qE "^feat(\(.+\))?:"; then
+elif grep -qE "^feat(\(.+\))?:" <<< "$COMMITS"; then
 	BUMP=minor
-elif echo "$COMMITS" | grep -qE "^(fix|perf|refactor)(\(.+\))?:"; then
+elif grep -qE "^(fix|perf|refactor)(\(.+\))?:" <<< "$COMMITS"; then
 	BUMP=patch
-elif echo "$COMMITS" | grep -qE "^docs(\(.+\))?:" &&
-	echo "$CHANGED_FILES" | grep -qE "^(src/)?(\.ai/guidelines/|\.ai/templates/|\.ai/model-routing\.yaml$|\.agents/skills/|\.agents/scripts/|GEMINI\.md$)"; then
+elif grep -qE "^docs(\(.+\))?:" <<< "$COMMITS" &&
+	grep -qE "^(src/)?(\.ai/guidelines/|\.ai/templates/|\.ai/model-routing\.yaml$|\.agents/skills/|\.agents/scripts/|GEMINI\.md$)" <<< "$CHANGED_FILES"; then
 	BUMP=patch
 else
 	BUMP=none

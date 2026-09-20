@@ -182,6 +182,48 @@ test_docs_outside_distributed_paths_does_not_release() {
   fi
 }
 
+test_many_commits_still_detects_the_bump() {
+  # Regressao de um release bloqueado em silencio. A deteccao usava
+  # `echo "$COMMITS" | grep -q`; o grep sai no primeiro match e fecha o pipe, o
+  # echo morre de SIGPIPE, e com `set -o pipefail` o pipeline vira 141 -- lido
+  # como "nao houve match", e o release anunciava "nada releasable".
+  #
+  # Duas condicoes precisam valer juntas para reproduzir, e faltar uma faz o
+  # teste passar com o bug presente. O `git log` imprime do mais NOVO para o
+  # mais velho, entao o commit `feat` tem que ser o ULTIMO criado, para o match
+  # cair logo no inicio da saida e o grep sair cedo. E o volume atras dele
+  # precisa passar do buffer do pipe, senao o echo termina de escrever antes de
+  # o grep desistir e nao ha SIGPIPE nenhum.
+  local repo_dir="$TMP_DIR/repo-volume"
+  local origin_dir="$TMP_DIR/origin-volume.git"
+
+  setup_release_repo "$repo_dir" "$origin_dir"
+
+  local corpo
+  corpo="$(head -c 3000 /dev/zero | tr '\0' 'x')"
+  local i
+  for i in $(seq 1 25); do
+    printf "%s\n" "$i" >> "$repo_dir/f.txt"
+    git -C "$repo_dir" add f.txt
+    git -C "$repo_dir" commit -m "chore: ruido $i" -m "$corpo" >/dev/null
+  done
+
+  # Por ultimo, para aparecer primeiro no log.
+  printf "releasable\n" >> "$repo_dir/f.txt"
+  git -C "$repo_dir" add f.txt
+  git -C "$repo_dir" commit -m "feat(x): mudanca releasable" >/dev/null
+
+  run_release "$repo_dir" "$TMP_DIR/release-volume.log"
+
+  local version
+  version="$(cat "$repo_dir/VERSION")"
+  [ "$version" = "0.3.0" ] ||
+    fail "log grande com feat no topo deveria dar minor 0.3.0, recebida $version"
+
+  git -C "$repo_dir" rev-parse --verify v0.3.0 >/dev/null ||
+    fail "tag v0.3.0 nao foi criada com log grande"
+}
+
 test_docs_guideline_change_releases_patch
 test_bump_override_downgrades_a_breaking_change
 test_bump_override_rejects_garbage
@@ -189,5 +231,6 @@ test_bump_override_does_not_invent_a_release
 test_docs_skill_change_releases_patch
 test_docs_model_routing_change_releases_patch
 test_docs_outside_distributed_paths_does_not_release
+test_many_commits_still_detects_the_bump
 
 echo "scripts/test-release.sh: ok"
