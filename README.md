@@ -391,6 +391,31 @@ Há ainda um **aviso** quando todos os slots de um papel de gate resolvem para o
 mesmo provedor: o papel não tem alternativa legítima, e foi exatamente assim que
 o caso real começou.
 
+### Prova de ocorrência
+
+As regras acima conferem **forma**: se o registro está bem preenchido, se aponta
+para um slot que existe, se o revisor difere de quem executou. Nenhuma delas
+pergunta se a execução aconteceu — um agente pode escrever `verdict: approved`
+sem jamais ter chamado revisor nenhum.
+
+Quem responde isso é o `lnx-run.sh`. A cada execução delegada ele grava um
+diretório com `meta.json`, `exit-code` e log. Quem escreve esse diretório é o
+script, não o agente medido, e é aí que está a diferença.
+
+Cada entrada de `tests[]` e `reviews[]` pode declarar o `run_id` daquela
+execução. Quando declara, o validador abre o registro e confere que ele existe,
+que é **desta** task (o que pega `run_id` copiado de outra), que papel, modelo,
+effort, slot e runner batem com o que a linha afirma, e que há `exit-code` —
+porque gate fechado por execução que talvez ainda esteja rodando não é gate.
+
+Ausente é **aviso**, e só quando o gate é obrigatório. Divergente é **erro**.
+
+Mentir custava uma linha de YAML; agora custa fabricar uma árvore de arquivos
+com carimbos que o agente não emite.
+
+**Limite declarado:** `.lnx/` não entra no git, então isso vale na máquina que
+executou — que é onde o gate roda, mas significa que CI não reconfere depois.
+
 Para converter o front matter de uma task legada sem inventar identidades de
 executor ou revisor, simule primeiro e aplique explicitamente:
 

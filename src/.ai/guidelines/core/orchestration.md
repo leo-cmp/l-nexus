@@ -446,6 +446,26 @@ Registre em `model_execution`: orquestrador, executor (com `selection`, effort,
 runner e tentativas), cada execução de teste e cada review, sempre com o commit
 avaliado.
 
+### `run_id`: o que sustenta o gate
+
+Cada entrada de `tests[]` e `reviews[]` deve trazer o `run_id` da execução que a
+produziu — o nome do diretório que o `lnx-run.sh` criou, sem o caminho.
+
+Sem ele, o gate repousa inteiramente no que você escreve sobre si mesmo: nada
+distingue uma revisão que aconteceu de uma linha digitada. Com ele, o
+`validate-task` abre o registro correspondente e confere que o papel, o modelo,
+o effort, o slot e o runner batem com o que a entrada afirma, que o registro é
+**desta** task, e que a execução terminou. Quem escreve esse registro é o script,
+no momento em que o agente roda; você não o edita.
+
+- copiar um `run_id` de outra execução não ajuda: o registro carrega o nome da
+  task que o gerou, e é ele quem responde;
+- `run_id` ausente é aviso quando o gate é obrigatório, nunca erro — task antiga
+  não quebra. Divergente é erro;
+- se um gate rodou fora do `lnx-run.sh` e não tem registro, **diga isso** em vez
+  de inventar um identificador. Aviso registrado é informação; identificador
+  fabricado é fraude.
+
 O relatório final ao humano deve informar: risco, categorias, quem orquestrou,
 quem executou (modelo, effort, CLI, slot, tentativas), dificuldades, arquivos
 alterados, resultado dos testes, findings, reworks, quem revisou, commit final e
@@ -453,7 +473,7 @@ aprovação.
 
 ---
 
-## 11. Cota esgotada: bloquear é desfecho, não fracasso
+## 12. Cota esgotada: bloquear é desfecho, não fracasso
 
 Quando a cota de um provedor acaba no meio da execução, o Orchestrator fica sem
 opção válida — e é exatamente aí que ele tende a improvisar. O caso que originou

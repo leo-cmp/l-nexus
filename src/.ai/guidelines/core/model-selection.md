@@ -129,6 +129,11 @@ serializacao canonica do proprio bloco, sem o campo do hash.
   o catalogo, porque qualquer runtime pode orquestrar.
 - Cada revisor adiciona uma entrada em `model_execution.reviews` com agente,
   provedor, modelo, commit, instante, veredito e resumo dos achados.
+- Toda entrada de `tests` e `reviews` traz o `run_id` da execucao que a produziu,
+  quando ela passou pelo `lnx-run.sh`. E o que separa um gate que aconteceu de
+  uma linha escrita: o validador abre o registro daquele run e confere papel,
+  modelo, effort, slot e runner contra o que a entrada afirma. Gate sem `run_id`
+  e aceito com aviso; `run_id` que nao corresponde e erro.
 - Identidade `unknown` nao satisfaz execucao ou revisao R3 por padrao.
 
 ## Saida do Model Router

@@ -66,9 +66,34 @@ cli_runners:
       supported: false                         # declare `true` só se a CLI aplica mesmo
       argv: ["--effort", "{effort}"]
       mapping: { low: ..., high: ..., max: ... }
+    env:                                       # ambiente desta execução (ver abaixo)
+      ANTHROPIC_BASE_URL: "http://localhost:PORTA/v1"
 ```
 
 Placeholders: `{prompt}`, `{model}`, `{effort}`.
+
+### Ambiente por execução (`env`)
+
+Um mesmo binário fala com provedores diferentes conforme o endpoint, e é assim
+que um proxy local se liga. Sem poder variar o ambiente por execução, a única
+saída seria editar a configuração global da CLI — que vale para **tudo**,
+inclusive para as sessões que não deviam passar pelo proxy.
+
+O `lnx-run.sh` recebe esses pares em `--env NOME=VALOR` e os exporta no
+supervisor, o que cobre de uma vez os quatro modos de lançamento.
+
+Duas regras, porque essas variáveis quase sempre carregam credencial:
+
+- o arquivo `env` do diretório do run fica com permissão `600`, e o `meta.json`
+  guarda **apenas os nomes** das variáveis. O registro diz o que foi injetado
+  sem publicar o valor;
+- um runner atrás de proxy é um **runner separado**, com nome próprio. Não
+  reaproveite a entrada da CLI direta. As duas têm capacidades diferentes: se o
+  proxy não repassa o parâmetro de raciocínio, aquela entrada precisa declarar
+  `effort.supported: false`, senão o kit credita esforço que não foi aplicado —
+  exatamente o que essa declaração existe para impedir. Verifique antes de
+  declarar `true`: mande o mesmo prompt com um orçamento de raciocínio mínimo e
+  outro alto, e compare. Se não mudar nada, não foi aplicado.
 
 ### Abrir em modo interativo
 
