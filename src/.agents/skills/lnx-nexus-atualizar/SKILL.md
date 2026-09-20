@@ -56,13 +56,33 @@ description: Atualiza o pacote l-nexus para a versao mais recente via npx update
    npx @leo-cmp/l-nexus migrate-routing .ai/model-routing.yaml --write
    ```
 
-5. **Repassar as notas de revisao manual.** O `--write` imprime no stderr uma
-   lista do que ele se recusou a decidir sozinho. Nao engula essa lista:
-   mostre-a ao usuario. Ela costuma conter escolhas reais, como o piso do
-   tester ter sido herdado do executor (o lado seguro do erro) quando um tester
-   mais barato tambem seria valido.
+5. **Sincronizar o catalogo e rotas do kit.** Apos a migracao (se houve), o
+   arquivo esta no schema correto. Agora sincronize o catalogo e as rotas do
+   kit com o projeto. O padrao e dry-run: simule e apresente o resultado:
 
-6. **Tasks existentes:** continuam validas no schema antigo e **nao** precisam
+   ```bash
+   npx @leo-cmp/l-nexus sync-routing .ai/model-routing.yaml
+   ```
+
+   Mostre o que mudaria (modelos que entram, saem, mudam e quais secoes sao
+   atualizadas). Deixe claro que **nao** encosta em `project_policy`,
+   `risk_domains.project`, `cli_runners`, `terminal_runners` e `runner_policy`:
+   essas decisoes pertencem ao projeto e a maquina.
+
+   Se o usuario concordar, aplique com `--write`:
+   ```bash
+   npx @leo-cmp/l-nexus sync-routing .ai/model-routing.yaml --write
+   ```
+
+   Se o schema ainda estiver divergente, o comando recusara e pedira para rodar
+   `migrate-routing` antes.
+
+6. **Repassar as notas de revisao manual** (se houve migracao). O `migrate-routing --write` imprime no stderr uma lista do que ele se recusou a decidir sozinho.
+   Nao engula essa lista: mostre-a ao usuario. Ela costuma conter escolhas
+   reais, como o piso do tester ter sido herdado do executor (o lado seguro do
+   erro) quando um tester mais barato tambem seria valido.
+
+7. **Tasks existentes:** continuam validas no schema antigo e **nao** precisam
    migrar. Se o usuario quiser adotar o contrato novo numa task especifica:
    ```bash
    npx @leo-cmp/l-nexus migrate-task <caminho-da-task> --to 2 --write
@@ -71,7 +91,7 @@ description: Atualiza o pacote l-nexus para a versao mais recente via npx update
    `needs_manual_routing` e o validador reprova ate um humano completar o
    roteamento. Avise o usuario disso antes de rodar.
 
-7. **Reportar:**
+8. **Reportar:**
    - Versao instalada.
    - Diretorios re-copiados.
    - Se o roteamento foi migrado, para qual schema, e as notas de revisao manual.
