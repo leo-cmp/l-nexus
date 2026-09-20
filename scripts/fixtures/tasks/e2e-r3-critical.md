@@ -24,25 +24,24 @@ model_plan:
     default: { model: openai-gpt-5-6-sol, effort: max }
     alt1: { model: anthropic-opus-5, effort: max }
     alt2: { model: anthropic-sonnet-5, effort: max }
-    alt3: { model: anthropic-sonnet-5, effort: max }
     upgrade_alt1: { model: anthropic-opus-5, effort: max }
     upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
   tester:
     required: true
     required_profile: balanced
-    default: { model: openai-gpt-5-6-terra, effort: high }
-    alt1: { model: xiaomi-mimo-v2-5, effort: high }
+    default: { model: xiaomi-mimo-v2-5, effort: high }
+    alt1: { model: alibaba-qwen-3-8-flash, effort: high }
   reviewer:
     required: true
     required_profile: frontier
     independent_model: true
     cross_provider_required: true
     default: { model: deepseek-v4-1-flash, effort: max }
-    alt1: { model: meta-muse-spark-1-3-contributor, effort: max }
+    alt1: { model: openai-gpt-5-6-terra, effort: max }
 routing_rationale:
   executor: Dominio de pagamento com idempotencia exige capacidade frontier.
   tester: Um tester independente e mais barato verifica o comportamento observavel.
-  reviewer: R3 exige revisao independente e, neste projeto, de outro provedor.
+  reviewer: R3 exige revisao independente e, neste projeto, de outro provedor. Nenhum modelo se repete entre os tres papeis, e o endpoint contributor fica fora porque a task carrega dado financeiro. Nao ha alt3 porque o catalogo nao tem um sexto modelo frontier livre para este plano, e alt3 e opcional.
   upgrades: Upgrades ficam reservados para falha persistente apos o rework.
 orchestration:
   mode: orchestrated
@@ -66,11 +65,11 @@ model_execution:
     attempts: 2
   tests:
     - selection: default
-      agent: codex
-      provider: openai
-      model: openai-gpt-5-6-terra
+      agent: opencode
+      provider: xiaomi
+      model: xiaomi-mimo-v2-5
       effort: high
-      runner: codex
+      runner: opencode
       commit: abc1234
       tested_at: 2026-08-31 10:10
       verdict: passed

@@ -344,6 +344,39 @@ npx @leo-cmp/l-nexus validate-task \
   --final-commit "$(git rev-parse HEAD)"
 ```
 
+### Plano congelado
+
+Quem escreve a task congela o plano ao terminar:
+
+```bash
+npx @leo-cmp/l-nexus validate-task .planning/PLAN_VN/tasks/task_X_Y.md --write-plan-hash
+```
+
+A flag grava `model_plan.plan_hash`, o sha256 de uma serialização canônica do
+bloco sem o próprio campo. Sem isso, a validação é circular: ela confere a
+execução contra o plano **como o plano está na hora da validação**, e quem
+executa pode editar o plano para caber na própria escolha. Houve caso real —
+cota do revisor esgotada, um slot `alt2` acrescentado ao plano, o rationale
+reescrito para justificá-lo, e o validador aprovando um gate que nunca existiu.
+
+Plano sem `plan_hash` valida com **aviso**, para não quebrar task antiga. Plano
+com `plan_hash` divergente é **erro**. Avisos saem em canal próprio e nunca
+mudam o exit code.
+
+### Independência dos gates
+
+Três regras tornam o gate difícil de encenar, e as três são **erro**:
+
+- um modelo não pode ocupar dois papéis do mesmo `model_plan` — repetir dentro
+  de um papel é permitido, atravessar papéis não;
+- quem assinou o teste que passou no commit final não assina a revisão dele;
+- em R3, revisor diferente do executor e, com `r3_cross_provider`, de outro
+  provedor.
+
+Há ainda um **aviso** quando todos os slots de um papel de gate resolvem para o
+mesmo provedor: o papel não tem alternativa legítima, e foi exatamente assim que
+o caso real começou.
+
 Para converter o front matter de uma task legada sem inventar identidades de
 executor ou revisor, simule primeiro e aplique explicitamente:
 

@@ -75,6 +75,18 @@ models:
     capabilities: [backend, tests, sql, review]
     last_evaluated: "2026-08-16"
     evidence: Local evaluation
+  model-lateral:
+    provider: provider-d
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, tests, sql, review]
+    last_evaluated: "2026-08-16"
+    evidence: Local evaluation
   model-retired:
     provider: provider-a
     profile: frontier

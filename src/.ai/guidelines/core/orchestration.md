@@ -386,7 +386,10 @@ Se o `cli_runners` escolhido não declarar `effort.supported: true`:
   execução. O contrato passou a "bater" porque o contrato tinha sido reescrito.
   Editar o plano para que a própria escolha caiba nele **é** replanejar, e é a
   forma mais difícil de detectar, porque não deixa nada em falta — deixa tudo
-  coerente;
+  coerente. Por isso o plano é congelado na criação: `model_plan.plan_hash`
+  guarda o sha256 do bloco, e qualquer edição posterior faz o `validate-task`
+  falhar. Regravar o hash para acomodar a própria edição não corrige nada —
+  é a mesma violação com uma etapa a mais;
 - replanejar a task.
 
 ---

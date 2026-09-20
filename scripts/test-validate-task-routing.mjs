@@ -567,6 +567,29 @@ test('item 1: rejects a frozen plan that changed after hashing', () => {
   }
 });
 
+test('item 1: the frozen hash survives a reformat that does not change the plan', () => {
+  // A serializacao e canonica de proposito: reescrever o mesmo slot em estilo
+  // flow, ou em outra ordem de chaves, nao muda o plano e nao pode invalidar o
+  // congelamento. Sem isto, qualquer reformatacao viraria acusacao de fraude.
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-hash-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    spawnSync(process.execPath, [validator, taskPath, '--routing', routingV2, '--write-plan-hash'], { encoding: 'utf8' });
+    const reformatted = readFileSync(taskPath, 'utf8').replace(
+      '    alt1:\n      model: model-variant\n      effort: high',
+      '    alt1: { effort: high, model: model-variant }',
+    );
+    assert.notEqual(reformatted, readFileSync(taskPath, 'utf8'));
+    writeFileSync(taskPath, reformatted);
+    const result = validateV2('v2-r3-valid.md', { taskPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /plan_hash/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('item 1: rejects a plan_hash that is not a non-empty string', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace('  schema: 2\n', '  schema: 2\n  plan_hash: ""\n'), (result) => {
     assert.notEqual(result.status, 0);
@@ -641,9 +664,12 @@ test('item 3: does not treat a shared prefix shorter than 7 hex chars as a match
 // ---------------------------------------------------------------------------
 
 test('item 4: accepts an execution that records the alt3 lateral slot', () => {
+  // alt3 aponta para um modelo que nenhum outro slot usa, entao passar aqui
+  // prova que o slot foi mesmo resolvido, e nao confundido com alt2.
   withTemporaryTask('v2-r3-valid.md', (task) => task
     .replace('    selection: default\n    agent: executor', '    selection: alt3\n    agent: executor')
-    .replace('    model: model-executor\n    provider: provider-a\n    effort: high', '    model: model-executor\n    provider: provider-a\n    effort: max'),
+    .replace('    model: model-executor\n    provider: provider-a\n    effort: high\n    runner: runner-a',
+      '    model: model-lateral\n    provider: provider-d\n    effort: max\n    runner: runner-effort'),
   (result) => {
     assert.equal(result.status, 0, result.stderr);
   });
@@ -651,7 +677,7 @@ test('item 4: accepts an execution that records the alt3 lateral slot', () => {
 
 test('item 4: a plan without alt3 stays valid (compatibility)', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
-    '    alt3:\n      model: model-executor\n      effort: max\n',
+    '    alt3:\n      model: model-lateral\n      effort: max\n',
     '',
   ), (result) => {
     assert.equal(result.status, 0, result.stderr);

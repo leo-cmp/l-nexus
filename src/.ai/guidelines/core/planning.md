@@ -38,9 +38,13 @@
   modelo e politica de revisao/teste. Nao fixe fornecedor como preferencia
   global e nao acople modelo a uma CLI especifica.
 - O Planner resolve e PERSISTE o roteamento completo na task: para o executor,
-  os cinco slots (`default`, `alt1`, `alt2`, `upgrade_alt1`, `upgrade_alt2`),
-  cada um com seu `effort`; para tester e reviewer, ao menos o `default`.
-  `alt1`/`alt2` sao alternativas laterais, `upgrade_alt*` sao escalada vertical.
+  os slots (`default`, `alt1`, `alt2`, o opcional `alt3`, `upgrade_alt1`,
+  `upgrade_alt2`), cada um com seu `effort`; para tester e reviewer, ao menos o
+  `default`. `alt1`/`alt2`/`alt3` sao alternativas laterais, `upgrade_alt*` sao
+  escalada vertical. Nenhum modelo pode servir dois papeis do mesmo plano.
+- Resolvido o roteamento, o Planner congela o bloco com
+  `validate-task <task> --write-plan-hash`. Dali em diante o `model_plan` e
+  contrato verificavel, nao texto que o executor possa ajustar a propria escolha.
 - Cada escolha precisa ser auditavel em `routing_rationale`.
 - Risco R2 ou R3 exige `risk.rationale` explicando o impacto concreto da falha.
 - Dominios listados em `risk_domains.generic_r3` sao R3 por padrao. O projeto

@@ -30,7 +30,7 @@ model_plan:
       model: model-executor
       effort: max
     alt3:
-      model: model-executor
+      model: model-lateral
       effort: max
     upgrade_alt1:
       model: model-variant

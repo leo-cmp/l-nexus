@@ -12,6 +12,8 @@ routing:
   categories: []
   technologies: []
   required_capabilities: []
+# Um modelo nao pode aparecer em dois papeis. Ao terminar de preencher, congele:
+#   npx @leo-cmp/l-nexus validate-task <caminho-da-task> --write-plan-hash
 model_plan:
   schema: 2
   created_by:
