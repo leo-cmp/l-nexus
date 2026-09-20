@@ -89,8 +89,15 @@ saída JSON:
 | CLI | reporta? | onde |
 |---|---|---|
 | `claude` | sim | `modelUsage.<modelo>.canonicalModel`, com `provider` |
+| `codex` | não | `--json` emite 4 eventos de ciclo de vida, nenhum com modelo |
 | `agy` | não | o JSON traz conversa, status, duração e tokens, sem modelo |
 | `opencode` | não | nenhum campo de model ou provider em nenhum evento |
+
+Um em quatro. Nos outros três, o que o registro afirma sobre o modelo é o que
+foi **pedido** — e isso vale enquanto ninguém ligar fallback na CLI. Se ligar, a
+identidade se perde do mesmo jeito que se perderia atrás de um proxy, só que sem
+painel para conferir depois. Para alternativa direta, a regra é **não ligar
+fallback**: é a diferença entre um modelo desconhecido e um modelo sabido.
 
 Por isso o observador é **opcional e por runner**: o kit define onde a evidência
 mora, a máquina define como obtê-la — e assim o kit não ganha dependência nova
