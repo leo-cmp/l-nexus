@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -843,5 +843,97 @@ test('git witness: warns when no committed version predates the execution record
   withTaskInRepository('v2-r3-valid.md', { committed: (source) => source, working: (source) => source }, (result) => {
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stderr, /has no committed version predating its execution record/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Prova de ocorrencia: a linha da task contra o registro do lnx-run.
+// ---------------------------------------------------------------------------
+
+// O validador procura o diretorio que o lnx-run.sh grava. Estes testes montam
+// esse diretorio a mao, no mesmo formato do script, e deixam a task ao lado
+// dele — que e tambem o caminho que a busca por .lnx/runtime percorre.
+const RUN_ID = '20260816T102500Z-reviewer-1-4242';
+
+function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', patch = (task) => task }, assertions) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-run-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, patch(fixtureSource('v2-r3-valid.md')));
+    const runDirectory = path.join(directory, '.lnx', 'runtime', 'TASK-V2-R3', runId);
+    mkdirSync(runDirectory, { recursive: true });
+    writeFileSync(path.join(runDirectory, 'meta.json'), JSON.stringify({
+      schema: 1,
+      run_id: runId,
+      task: 'TASK-V2-R3',
+      role: 'reviewer',
+      slot: 'default',
+      model: 'model-reviewer',
+      effort: 'high',
+      runner: 'runner-a',
+      started_at: '2026-08-16T10:25:00Z',
+      ...meta,
+    }, null, 2));
+    if (exitCode !== null) writeFileSync(path.join(runDirectory, 'exit-code'), `${exitCode}\n`);
+    assertions(validateV2('v2-r3-valid.md', { taskPath }), runDirectory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+function withReviewRunId(runId) {
+  return (task) => task.replace('      reviewed_at: 2026-08-16 10:30',
+    `      run_id: ${runId}\n      reviewed_at: 2026-08-16 10:30`);
+}
+
+test('run evidence: warns when a required gate is not backed by a run_id', () => {
+  const result = validateV2('v2-r3-valid.md');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /reviews\[0\]\.run_id: is absent, so this gate rests on what the task says about itself/);
+});
+
+test('run evidence: accepts a review backed by a matching run record', () => {
+  withRunRecord({ patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /reviews\[0\]\.run_id/);
+  });
+});
+
+test('run evidence: rejects a run_id with no run record', () => {
+  withRunRecord({ patch: withReviewRunId('20260816T999999Z-reviewer-9-1') }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /reviews\[0\]\.run_id: has no run record at /);
+  });
+});
+
+test('run evidence: rejects a run record that belongs to another task', () => {
+  // O caso do run_id copiado: o registro existe e esta perfeito, mas e de outra
+  // task. Quem desmente e o campo `task` do proprio registro.
+  withRunRecord({ meta: { task: 'TASK-OTHER' }, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /belongs to task TASK-OTHER, not to TASK-V2-R3/);
+  });
+});
+
+test('run evidence: rejects a run record whose model is not the declared one', () => {
+  withRunRecord({ meta: { model: 'model-variant' }, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /records model model-variant, but the task declares model-reviewer/);
+  });
+});
+
+test('run evidence: rejects a run that never finished', () => {
+  withRunRecord({ exitCode: null, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /without exit-code, so the run never finished/);
+  });
+});
+
+test('run evidence: rejects a run that started after the result it backs', () => {
+  // Quatro dias depois do parecer que ele deveria sustentar: passa longe de
+  // qualquer duvida de fuso horario.
+  withRunRecord({ meta: { started_at: '2026-08-20T10:00:00Z' }, patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /after the reviewer result it is supposed to back/);
   });
 });

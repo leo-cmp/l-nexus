@@ -427,4 +427,41 @@ headless "$RUNNER" start --task TASK-8 --role executor --runner fake \
     --runner-bin fake-agent --cwd "$PROJECT" --fallback inline --timeout later 2>/dev/null &&
     fail "start accepted a non-numeric --timeout"
 
+# --- o runner precisa alcancar outro endpoint sem mexer na config global ----
+#
+# Um proxy local se liga por variavel de ambiente. Sem poder variar o ambiente
+# por execucao, a unica saida seria editar a configuracao global da CLI, que
+# vale para tudo -- inclusive para as sessoes que nao deviam passar pelo proxy.
+
+cat > "$BIN/fake-env-agent" <<'AGENT'
+#!/usr/bin/env bash
+echo "BASE=[${LNX_TEST_BASE_URL:-unset}]"
+echo "TOKEN=[${LNX_TEST_TOKEN:-unset}]"
+AGENT
+chmod +x "$BIN/fake-env-agent"
+
+output="$(headless "$RUNNER" start --task TASK-ENV --role executor --runner fake \
+    --runner-bin fake-env-agent --cwd "$PROJECT" --fallback inline --hold never \
+    --env LNX_TEST_BASE_URL=http://localhost:20128/v1 --env LNX_TEST_TOKEN=segredo 2>&1)"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output" | head -1)"
+[ -n "$run_dir" ] || fail "start with --env did not report a run directory"
+grep -q 'BASE=\[http://localhost:20128/v1\]' "$run_dir/output.log" ||
+    fail "--env did not reach the delegated runner"
+grep -q 'TOKEN=\[segredo\]' "$run_dir/output.log" ||
+    fail "--env delivered only part of the environment"
+
+# O registro diz o que foi injetado sem publicar o valor, porque essas variaveis
+# quase sempre carregam credencial.
+grep -q '"env_names": "LNX_TEST_BASE_URL,LNX_TEST_TOKEN"' "$run_dir/meta.json" ||
+    fail "meta.json did not record the injected variable names"
+grep -q 'segredo' "$run_dir/meta.json" &&
+    fail "meta.json leaked an environment value"
+perms="$(stat -c '%a' "$run_dir/env" 2>/dev/null || echo unknown)"
+[ "$perms" = 600 ] || fail "the env file is not owner-only: $perms"
+
+headless "$RUNNER" start --task TASK-ENV2 --role executor --runner fake \
+    --runner-bin fake-env-agent --cwd "$PROJECT" --fallback inline --hold never \
+    --env "NOT VALID=1" 2>/dev/null &&
+    fail "start accepted an --env with an invalid variable name"
+
 echo "scripts/test-lnx-run.sh: ok"

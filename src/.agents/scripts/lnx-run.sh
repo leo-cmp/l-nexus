@@ -35,7 +35,8 @@ usage() {
 Usage:
   lnx-run.sh detect-terminal [--terminal NAME] [--terminal-preference a,b,c]
   lnx-run.sh start --task ID --role ROLE --runner NAME --runner-bin BIN
-                   [--runner-arg ARG]... [--slot SLOT] [--model M] [--effort E]
+                   [--runner-arg ARG]... [--env NAME=VALUE]...
+                   [--slot SLOT] [--model M] [--effort E]
                    [--prompt-file FILE] [--prompt-delivery argv|file|stdin]
                    [--attempt N] [--cwd DIR] [--run-root DIR]
                    [--terminal auto|none|NAME] [--terminal-cmd ARG]...
@@ -59,6 +60,8 @@ Placeholders substituted per argv element (never through a shell):
 
 Run directory contract:
   meta.json  status  exit-code  output.log  prompt.txt  command.txt  result.yaml
+  env        NUL-delimited NAME=VALUE pairs exported for the runner, mode 600.
+             meta.json records only the NAMES, never the values.
 USAGE
 }
 
@@ -244,6 +247,17 @@ command_supervise() {
             ;;
         *) printf '\033[2ml-nexus · %s\033[0m\n\n' "$label" ;;
     esac
+
+    # Exportar aqui cobre os quatro caminhos de lancamento abaixo de uma vez,
+    # porque todos sao filhos deste processo.
+    if [ -f "$run_dir/env" ]; then
+        local env_pairs=() pair
+        mapfile -d '' -t env_pairs < "$run_dir/env"
+        for pair in ${env_pairs[@]+"${env_pairs[@]}"}; do
+            [ -n "$pair" ] || continue
+            export "${pair?}"
+        done
+    fi
 
     local exit_code
     if [ "$io" = broker ]; then
@@ -604,7 +618,7 @@ command_start() {
     local requested_terminal=auto preference="$DEFAULT_TERMINAL_PREFERENCE"
     local fallback=block hold=keep hold_seconds=30 timeout=0
     local banner=compact detach=false io=auto
-    local runner_args=()
+    local runner_args=() run_env=() env_pair='' env_name=''
     TERMINAL_CMD=()
 
     while [ "$#" -gt 0 ]; do
@@ -617,6 +631,28 @@ command_start() {
             --runner) runner="${2:-}"; shift 2 ;;
             --runner-bin) runner_bin="${2:-}"; shift 2 ;;
             --runner-arg) runner_args+=("${2:-}"); shift 2 ;;
+            # Um mesmo binario pode falar com provedores diferentes conforme o
+            # endpoint, e e isso que um proxy local faz. Sem poder variar o
+            # ambiente por execucao, a unica saida seria editar a configuracao
+            # global da CLI -- que vale para tudo, inclusive para as sessoes que
+            # nao deviam passar pelo proxy.
+            --env)
+                # O nome inteiro precisa ser conferido, caractere a caractere.
+                # Um glob como [A-Za-z_]*=* aceitaria "NOT VALID=1", porque `*`
+                # casa espaco: conferiria so a primeira letra e a presenca do =.
+                env_pair="${2:-}"
+                env_name="${env_pair%%=*}"
+                case "$env_pair" in
+                    *=*) ;;
+                    *) die "start: --env expects NAME=VALUE: $env_pair" 2 ;;
+                esac
+                case "$env_name" in
+                    ''|[0-9]*|*[!A-Za-z0-9_]*)
+                        die "start: --env expects a valid variable name before '=': $env_pair" 2 ;;
+                esac
+                run_env+=("$env_pair")
+                shift 2
+                ;;
             --prompt-file) prompt_file="${2:-}"; shift 2 ;;
             --prompt-delivery) delivery="${2:-}"; shift 2 ;;
             --attempt) attempt="${2:-}"; shift 2 ;;
@@ -700,6 +736,18 @@ command_start() {
         esac
     done
 
+    # O ambiente do runner tipicamente carrega credencial, entao o arquivo e
+    # so-leitura-do-dono e o meta.json guarda apenas os NOMES das variaveis: o
+    # registro diz o que foi injetado sem publicar o valor.
+    local env_names='' pair
+    for pair in ${run_env[@]+"${run_env[@]}"}; do
+        env_names="${env_names:+$env_names,}${pair%%=*}"
+    done
+    if [ "${#run_env[@]}" -gt 0 ]; then
+        printf '%s\0' "${run_env[@]}" > "$run_dir/env"
+        chmod 600 "$run_dir/env" 2>/dev/null || true
+    fi
+
     printf '%s\0' "${argv[@]}" > "$run_dir/command.argv"
     printf '%q ' "${argv[@]}" > "$run_dir/command.txt"
     printf '\n' >> "$run_dir/command.txt"
@@ -740,6 +788,7 @@ command_start() {
   "effort": "$(json_escape "$effort")",
   "runner": "$(json_escape "$runner")",
   "runner_bin": "$(json_escape "$runner_bin")",
+  "env_names": "$(json_escape "$env_names")",
   "attempt": "$(json_escape "$attempt")",
   "terminal": "$(json_escape "$adapter")",
   "prompt_delivery": "$(json_escape "$delivery")",
