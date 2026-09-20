@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
 import { parseDocument } from 'yaml';
 
@@ -36,12 +37,15 @@ const ATTEMPT_BUDGETS = new Map([
 
 function usage() {
   return `Usage:
-  validate-task-routing.mjs <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash]
-  l-nexus validate-task <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash]
+  validate-task-routing.mjs <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash] [--allow-replan]
+  l-nexus validate-task <task-path> [--routing <routing-path>] [--final-commit <sha>] [--write-plan-hash] [--allow-replan]
   l-nexus migrate-task <task-path> [--to 1|2] [--write]
 
 Validates task front matter against model-routing.yaml (schema_version 1 or 2).
---write-plan-hash freezes task.model_plan by recording its plan_hash and exits.`;
+--write-plan-hash freezes task.model_plan by recording its plan_hash and exits.
+--allow-replan downgrades the git witness error to a warning. It exists for the
+human who deliberately replanned a task already under execution, and for nobody
+else: an agent that reaches for it is doing exactly what the check forbids.`;
 }
 
 function parseArguments(argv) {
@@ -54,11 +58,16 @@ function parseArguments(argv) {
     routingPath: '.ai/model-routing.yaml',
     finalCommit: null,
     writePlanHash: false,
+    allowReplan: false,
   };
   while (args.length > 0) {
     const value = args.shift();
     if (value === '--write-plan-hash') {
       options.writePlanHash = true;
+      continue;
+    }
+    if (value === '--allow-replan') {
+      options.allowReplan = true;
       continue;
     }
     if (value === '--routing' || value === '--final-commit') {
@@ -149,6 +158,78 @@ function validatePlanHash(plan, field, errors, warnings) {
   if (plan.plan_hash.trim().toLowerCase() !== expected) {
     addError(errors, `${field}.plan_hash`, `does not match the model plan contents (expected ${expected})`);
   }
+}
+
+// Git como testemunha do plano. O plan_hash prova que o bloco nao mudou desde
+// que foi congelado, mas quem pode rodar --write-plan-hash contorna a prova em
+// um comando: edita o plano, regrava o hash, segue. O historico nao se deixa
+// regravar assim. O arquivo da task ja foi commitado com um plano, e essa
+// versao esta fora do alcance de quem edita o arquivo agora — reescrever o
+// passado exige force-push e deixa rastro. Por isso a comparacao aqui e contra
+// o commit, e nao contra um campo que mora no mesmo arquivo que ela protege.
+const WITNESS_COMMIT_LIMIT = 50;
+
+function gitText(args, cwd) {
+  return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] });
+}
+
+// A testemunha e a ultima versao commitada ANTES de a execucao comecar: enquanto
+// nenhum executor foi registrado, replanejar e livre e legitimo, e o Planner
+// pode corrigir o plano quantas vezes precisar. Depois do primeiro registro de
+// execucao, o plano e contrato em vigor.
+function findPlanWitness(relativePath, cwd) {
+  const log = gitText(['log', '--format=%H', '--', relativePath], cwd).trim();
+  if (log === '') return null;
+  for (const commit of log.split('\n').slice(0, WITNESS_COMMIT_LIMIT)) {
+    let committed;
+    try {
+      committed = parseTaskFrontMatter(gitText(['show', `${commit}:${relativePath}`], cwd), commit);
+    } catch {
+      // Versao antiga sem front matter legivel nao serve de testemunho.
+      continue;
+    }
+    const execution = committed.model_execution;
+    if (!isObject(execution) || !isObject(execution.executor)) return { commit, plan: committed.model_plan };
+  }
+  return null;
+}
+
+function validatePlanWitness(task, taskPath, field, errors, warnings, { allowReplan = false } = {}) {
+  if (!isObject(task.model_plan)) return;
+  const execution = task.model_execution;
+  if (!isObject(execution) || !isObject(execution.executor)) return;
+
+  const cwd = path.dirname(path.resolve(taskPath));
+  let relativePath;
+  try {
+    relativePath = gitText(['ls-files', '--full-name', '--error-unmatch', '--', path.basename(taskPath)], cwd).trim();
+  } catch {
+    addWarning(warnings, field, 'is not tracked by git, so the plan has no witness outside the task file itself');
+    return;
+  }
+
+  let witness;
+  try {
+    witness = findPlanWitness(relativePath, cwd);
+  } catch {
+    addWarning(warnings, field, 'could not be read from git history, so the plan has no witness outside the task file itself');
+    return;
+  }
+  // Nenhuma versao commitada antecede a execucao: o arquivo entrou no historico
+  // ja com execucao registrada. Nao da para saber qual era o plano quando o
+  // trabalho comecou, e inventar um testemunho seria pior que nao ter nenhum.
+  if (!witness || !isObject(witness.plan)) {
+    addWarning(warnings, field,
+      'has no committed version predating its execution record, so git cannot witness the plan that was in force');
+    return;
+  }
+
+  // Compara o conteudo, nao o plan_hash: regravar o hash nao muda o plano, e
+  // mudar o plano nao escapa por regravar o hash.
+  if (computePlanHash(task.model_plan) === computePlanHash(witness.plan)) return;
+  const message = `differs from the plan committed in ${witness.commit.slice(0, 7)}, the last version recorded before execution started; editing the plan after the work began is replanning`;
+  if (allowReplan) addWarning(warnings, field, `${message} (accepted because --allow-replan was passed)`);
+  else addError(errors, field, message);
 }
 
 // Compara commits por prefixo de SHA: um SHA curto e o SHA completo do mesmo
@@ -984,7 +1065,7 @@ function resolveFinalCommit(override) {
   }
 }
 
-export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing.yaml', finalCommit }) {
+export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing.yaml', finalCommit, allowReplan = false }) {
   const errors = [];
   const warnings = [];
   let routing;
@@ -1008,6 +1089,7 @@ export function validateTaskRouting({ taskPath, routingPath = '.ai/model-routing
     return { valid: false, errors: [error.message], warnings };
   }
   validateTask(task, routing, resolvedFinalCommit, errors, warnings);
+  validatePlanWitness(task, taskPath, 'task.model_plan', errors, warnings, { allowReplan });
   return { valid: errors.length === 0, errors, warnings, finalCommit: resolvedFinalCommit };
 }
 

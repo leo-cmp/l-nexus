@@ -363,6 +363,20 @@ Plano sem `plan_hash` valida com **aviso**, para não quebrar task antiga. Plano
 com `plan_hash` divergente é **erro**. Avisos saem em canal próprio e nunca
 mudam o exit code.
 
+Sozinho, o `plan_hash` seria convenção: quem pode rodar `--write-plan-hash`
+edita o plano, regrava o hash e segue. Por isso o validador também usa **git
+como testemunha**. Ele procura no histórico do arquivo a última versão commitada
+**antes** de a execução ser registrada — o plano como estava quando o trabalho
+começou — e compara com o plano atual. Regravar o hash não ajuda: a comparação é
+de conteúdo, e o histórico não se deixa reescrever sem force-push.
+
+Enquanto nenhum executor foi registrado, replanejar é livre: o Planner corrige o
+plano quantas vezes precisar. Depois disso, divergência é **erro**. Sem
+repositório, sem o arquivo versionado, ou sem nenhuma versão commitada anterior
+ao registro de execução, sai **aviso** — não há testemunho, e fingir que há
+seria pior. Para o humano que replanejou de propósito uma task já em execução,
+`--allow-replan` rebaixa o erro a aviso.
+
 ### Independência dos gates
 
 Três regras tornam o gate difícil de encenar, e as três são **erro**:

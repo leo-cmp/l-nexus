@@ -743,4 +743,105 @@ test('item 6: warns when every reviewer slot uses the same provider', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Git como testemunha do plano.
+// ---------------------------------------------------------------------------
 
+// A testemunha so existe dentro de um repositorio, entao estes testes montam
+// um: a task entra no historico como o Planner a criou, sem execucao
+// registrada, e so depois a arvore de trabalho recebe a versao em execucao.
+function withTaskInRepository(fixture, { committed, working }, assertions) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-witness-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    const source = fixtureSource(fixture);
+    const git = (...args) => spawnSync('git', args, { cwd: directory, encoding: 'utf8' });
+    writeFileSync(taskPath, committed(source));
+    git('init', '-q', '.');
+    git('config', 'user.email', 'test@example.com');
+    git('config', 'user.name', 'test');
+    git('add', 'task.md');
+    git('commit', '-qm', 'task created');
+    writeFileSync(taskPath, working(source));
+    assertions(validateV2(fixture, { taskPath }), taskPath, directory);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+// Como o Planner deixa a task: plano escrito, nada executado ainda.
+function asCreated(source) {
+  return source.replace(/\nmodel_execution:[\s\S]*?\n---\n/, '\n---\n');
+}
+
+// O ataque: um slot do plano muda depois que a execucao ja foi registrada.
+function withEditedPlan(source) {
+  return source.replace('    alt3:\n      model: model-lateral\n      effort: max',
+    '    alt3:\n      model: model-lateral\n      effort: high');
+}
+
+test('git witness: rejects a plan edited after execution was recorded', () => {
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: withEditedPlan }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task\.model_plan: differs from the plan committed in [0-9a-f]{7}, the last version recorded before execution started/);
+  });
+});
+
+test('git witness: rewriting plan_hash does not rescue an edited plan', () => {
+  // E o furo que a testemunha existe para fechar: quem pode rodar
+  // --write-plan-hash regrava o hash do proprio plano editado e o congelamento
+  // volta a bater. O historico nao acompanha essa edicao.
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: withEditedPlan }, (result, taskPath) => {
+    assert.notEqual(result.status, 0);
+    const refrozen = spawnSync(process.execPath, [
+      validator, taskPath, '--routing', routingV2, '--write-plan-hash',
+    ], { encoding: 'utf8' });
+    assert.equal(refrozen.status, 0, refrozen.stderr);
+    const after = validateV2('v2-r3-valid.md', { taskPath });
+    assert.notEqual(after.status, 0);
+    assert.doesNotMatch(after.stderr, /plan_hash: does not match/);
+    assert.match(after.stderr, /task\.model_plan: differs from the plan committed in/);
+  });
+});
+
+test('git witness: --allow-replan downgrades the mismatch to a warning', () => {
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: withEditedPlan }, (result, taskPath) => {
+    const allowed = spawnSync(process.execPath, [
+      validator, taskPath, '--routing', routingV2, '--final-commit', 'abc1234', '--allow-replan',
+    ], { encoding: 'utf8' });
+    assert.equal(allowed.status, 0, allowed.stderr);
+    assert.match(allowed.stderr, /accepted because --allow-replan was passed/);
+  });
+});
+
+test('git witness: accepts the same plan that was committed before execution', () => {
+  withTaskInRepository('v2-r3-valid.md', { committed: asCreated, working: (source) => source }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /differs from the plan committed/);
+  });
+});
+
+test('git witness: warns instead of failing when the task is not tracked by git', () => {
+  // Fora de um repositorio nao ha testemunho, e nao ter testemunho e um risco
+  // conhecido — nao uma violacao de contrato.
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-witness-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    const result = validateV2('v2-r3-valid.md', { taskPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /task\.model_plan: is not tracked by git/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('git witness: warns when no committed version predates the execution record', () => {
+  // A task entrou no historico ja com execucao registrada: nao da para saber
+  // qual era o plano quando o trabalho comecou, e inventar um testemunho seria
+  // pior do que nao ter nenhum.
+  withTaskInRepository('v2-r3-valid.md', { committed: (source) => source, working: (source) => source }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /has no committed version predating its execution record/);
+  });
+});

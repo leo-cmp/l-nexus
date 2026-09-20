@@ -111,7 +111,11 @@ serializacao canonica do proprio bloco, sem o campo do hash.
   congelado.
 - Acrescentar, remover ou editar um slot depois disso e replanejar, e
   replanejar exige o humano. Regravar o hash para acomodar a propria edicao e
-  fraude, nao correcao.
+  fraude, nao correcao — e nao funciona: o validador compara o plano atual com a
+  ultima versao do arquivo commitada ANTES de a execucao ser registrada. O hash
+  mora no mesmo arquivo que ele protege; o historico, nao.
+- Enquanto nenhum executor estiver registrado, corrigir o plano e livre. Depois
+  do primeiro registro de execucao, o plano e contrato em vigor.
 
 ## Registro na Task
 

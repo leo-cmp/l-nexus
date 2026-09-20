@@ -389,7 +389,9 @@ Se o `cli_runners` escolhido não declarar `effort.supported: true`:
   coerente. Por isso o plano é congelado na criação: `model_plan.plan_hash`
   guarda o sha256 do bloco, e qualquer edição posterior faz o `validate-task`
   falhar. Regravar o hash para acomodar a própria edição não corrige nada —
-  é a mesma violação com uma etapa a mais;
+  é a mesma violação com uma etapa a mais, e não funciona: o validador compara o
+  plano com a última versão do arquivo commitada antes de a execução começar. O
+  arquivo você edita; o histórico, não;
 - replanejar a task.
 
 ---

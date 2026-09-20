@@ -83,7 +83,10 @@ teste que passou no commit final não assina a revisão dele.
 
 O plano é congelado ao ser escrito, com
 `validate-task <task> --write-plan-hash`, que grava `model_plan.plan_hash`.
-Editar um slot depois disso é replanejar, e replanejar é decisão do humano.
+Editar um slot depois disso é replanejar, e replanejar é decisão do humano. O
+validador confere o congelamento contra o histórico do git, não só contra o
+campo: a referência é a última versão do arquivo commitada antes de a execução
+ser registrada. Regravar o hash não contorna, porque a comparação é de conteúdo.
 
 As recomendações do projeto por tipo de trabalho vivem em `work_routes`. Elas
 selecionam modelos **dentro** do piso definido por `routes`, e nunca podem
