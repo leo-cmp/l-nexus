@@ -23,21 +23,22 @@ model_plan:
     required_capabilities: [backend, sql, tests]
     default: { model: openai-gpt-5-6-sol, effort: max }
     alt1: { model: anthropic-opus-5, effort: max }
-    alt2: { model: deepseek-v4-pro, effort: max }
+    alt2: { model: anthropic-sonnet-5, effort: max }
+    alt3: { model: anthropic-sonnet-5, effort: max }
     upgrade_alt1: { model: anthropic-opus-5, effort: max }
     upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
   tester:
     required: true
     required_profile: balanced
     default: { model: openai-gpt-5-6-terra, effort: high }
-    alt1: { model: deepseek-v4-pro, effort: high }
+    alt1: { model: xiaomi-mimo-v2-5, effort: high }
   reviewer:
     required: true
     required_profile: frontier
     independent_model: true
     cross_provider_required: true
-    default: { model: anthropic-opus-5, effort: max }
-    alt1: { model: deepseek-v4-pro, effort: max }
+    default: { model: deepseek-v4-1-flash, effort: max }
+    alt1: { model: meta-muse-spark-1-3-contributor, effort: max }
 routing_rationale:
   executor: Dominio de pagamento com idempotencia exige capacidade frontier.
   tester: Um tester independente e mais barato verifica o comportamento observavel.
@@ -75,11 +76,11 @@ model_execution:
       verdict: passed
   reviews:
     - selection: default
-      agent: claude-code
-      provider: anthropic
-      model: anthropic-opus-5
+      agent: opencode
+      provider: deepseek
+      model: deepseek-v4-1-flash
       effort: max
-      runner: claude
+      runner: opencode
       commit: abc1234
       reviewed_at: 2026-08-31 10:30
       verdict: approved

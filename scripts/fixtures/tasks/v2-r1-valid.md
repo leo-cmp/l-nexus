@@ -29,6 +29,9 @@ model_plan:
     alt2:
       model: model-economical
       effort: low
+    alt3:
+      model: model-economical
+      effort: low
     upgrade_alt1:
       model: model-tester
       effort: default
@@ -39,7 +42,7 @@ model_plan:
     required: false
     required_profile: economical
     default:
-      model: model-economical
+      model: model-variant
       effort: default
   reviewer:
     required: false
@@ -47,7 +50,7 @@ model_plan:
     independent_model: false
     cross_provider_required: false
     default:
-      model: model-tester
+      model: model-reviewer
       effort: default
 routing_rationale:
   executor: Local documentation change needs no more than economical capability.

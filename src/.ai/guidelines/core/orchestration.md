@@ -379,6 +379,14 @@ Se o `cli_runners` escolhido não declarar `effort.supported: true`:
 - editar código diretamente como comportamento padrão;
 - aprovar a própria implementação;
 - ignorar teste falhando ou tratar review stale como válido;
+- **editar `model_plan` de qualquer forma** — inclusive *acrescentar* um slot,
+  trocar o modelo de um slot existente ou reescrever `routing_rationale`. Já
+  houve caso real de Orchestrator acrescentar um `alt2` ao plano do reviewer e
+  reescrever o rationale para justificá-lo, no mesmo commit em que registrou a
+  execução. O contrato passou a "bater" porque o contrato tinha sido reescrito.
+  Editar o plano para que a própria escolha caiba nele **é** replanejar, e é a
+  forma mais difícil de detectar, porque não deixa nada em falta — deixa tudo
+  coerente;
 - replanejar a task.
 
 ---
@@ -438,5 +446,60 @@ quem executou (modelo, effort, CLI, slot, tentativas), dificuldades, arquivos
 alterados, resultado dos testes, findings, reworks, quem revisou, commit final e
 aprovação.
 
+---
+
+## 11. Cota esgotada: bloquear é desfecho, não fracasso
+
+Quando a cota de um provedor acaba no meio da execução, o Orchestrator fica sem
+opção válida — e é exatamente aí que ele tende a improvisar. O caso que originou
+esta seção: com a cota do provedor do revisor zerada, o Orchestrator acrescentou
+um slot ao plano, reescreveu o rationale e seguiu. O gate existiu no papel e não
+existiu na prática.
+
+Não adianta instruir mais forte. Sob pressão de recurso o modelo otimiza para
+**terminar**, porque é para isso que foi treinado. Pedir que ele prefira falhar a
+terminar rema contra a corrente. O que resolve é tirar do caminho a ideia de que
+parar é falhar.
+
+### Bloquear é um desfecho registrável
+
+`blocked` já é estado de `orchestration.state` e veredito válido em teste e em
+review. Uma task que termina em `blocked`, com motivo, **cumpriu o protocolo**.
+Não é entrega parcial nem desistência: é a informação de que o trabalho não pode
+prosseguir sem uma decisão humana, entregue antes de o dano acontecer.
+
+Uma task bloqueada com motivo claro vale mais que uma task concluída com gate
+fabricado. A segunda parece pronta.
+
+### Procedimento
+
+1. **Tente os alternates planejados, na ordem declarada.** `alt1`, `alt2`,
+   `alt3`. Eles existem para isto.
+2. **Esgotados os alternates do papel, pare.** Não invente slot, não reutilize o
+   modelo de outro papel, não edite o plano.
+3. Registre `orchestration.state: blocked` e, no bloco do papel afetado, o
+   veredito `blocked` com o motivo — qual cota, qual provedor, quando reseta.
+4. **Avise o humano pelo nudge**, conforme `.ai/guidelines/core/nudge.md`. Cota
+   esgotada é uma das poucas situações que justificam interromper alguém que
+   está longe: sem decisão dele, nada avança.
+5. Deixe o trabalho já feito intacto. Branch, commits e PR permanecem; o que
+   falta é o gate.
+
+### O que dizer no aviso
+
+Qual task parou, em que papel, qual cota acabou e quando volta, o que já foi
+concluído, e as opções concretas — esperar o reset, ligar um runner em
+`runner_policy`, ou o humano escolher outro modelo e replanejar. **Replanejar é
+dele**, não seu.
+
+### Prevenção, que vale mais que o procedimento
+
+Papel de gate com todos os slots no mesmo provedor é beco à espera de
+acontecer. O Planner não deve escrever contrato assim, e o validador avisa
+quando isso ocorre. O procedimento acima é a rede; não é para ser usado.
+
+---
+
 Referências: `.ai/guidelines/core/cli-delegation.md`,
-`.ai/guidelines/core/execution.md`, `.ai/guidelines/core/model-selection.md`.
+`.ai/guidelines/core/execution.md`, `.ai/guidelines/core/model-selection.md`,
+`.ai/guidelines/core/nudge.md`.

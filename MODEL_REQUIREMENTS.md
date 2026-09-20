@@ -63,12 +63,12 @@ um runner sem suporte é rejeitado — em vez de fingir que o esforço foi aplic
 
 ## Slots de Roteamento
 
-Cada papel roteado guarda até cinco opções, cada uma com o seu esforço:
+Cada papel roteado guarda até seis opções, cada uma com o seu esforço:
 
 | Slot | Significado |
 |---|---|
 | `default` | preferência normal |
-| `alt1`, `alt2` | alternativas **laterais**: indisponibilidade, rate limit, custo, provedor, especialização, preferência humana. Não são retry do default |
+| `alt1`, `alt2`, `alt3` | alternativas **laterais**: indisponibilidade, rate limit, custo, provedor, especialização, preferência humana. Não são retry do default; `alt3` é a última lateral, para modelos de cota curta |
 | `upgrade_alt1`, `upgrade_alt2` | escalada **vertical**: só depois de esgotar o rework ou quando a tarefa se revelar materialmente maior |
 
 Um upgrade nunca pode resolver para um perfil mais fraco que o `default`.

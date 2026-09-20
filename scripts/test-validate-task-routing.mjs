@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
+import { parseDocument } from 'yaml';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const validator = path.join(scriptsDirectory, 'validate-task-routing.mjs');
@@ -286,7 +288,7 @@ test('rejects a slot model that lacks a required capability', () => {
 
 test('rejects a slot model that is not active in the catalog', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
-    '    alt1:\n      model: model-reviewer\n      effort: high',
+    '    alt1:\n      model: model-variant\n      effort: high',
     '    alt1:\n      model: model-retired\n      effort: high',
   ), (result) => {
     assert.notEqual(result.status, 0);
@@ -296,7 +298,7 @@ test('rejects a slot model that is not active in the catalog', () => {
 
 test('rejects an upgrade slot weaker than the default slot', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
-    '    upgrade_alt1:\n      model: model-reviewer\n      effort: max',
+    '    upgrade_alt1:\n      model: model-variant\n      effort: max',
     '    upgrade_alt1:\n      model: model-tester\n      effort: default',
   ), (result) => {
     assert.notEqual(result.status, 0);
@@ -330,7 +332,7 @@ test('rejects an execution whose selection does not match the planned slot', () 
     '    selection: alt1\n    agent: executor',
   ), (result) => {
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /executor\.model: must match task\.model_plan\.executor\.alt1\.model \(model-reviewer\)/);
+    assert.match(result.stderr, /executor\.model: must match task\.model_plan\.executor\.alt1\.model \(model-variant\)/);
   });
 });
 
@@ -340,7 +342,9 @@ test('rejects an execution slot name that does not exist', () => {
     '    selection: alt9\n    agent: executor',
   ), (result) => {
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /executor\.selection: must be one of default, alt1, alt2, upgrade_alt1, upgrade_alt2/);
+    // O slot alt3 entrou na lista de slots validos (item 4), entao a mensagem
+    // que enumera os slots incidentes precisa inclui-lo.
+    assert.match(result.stderr, /executor\.selection: must be one of default, alt1, alt2, alt3, upgrade_alt1, upgrade_alt2/);
   });
 });
 
@@ -439,6 +443,9 @@ test('accepts an effort-dependent slot when the runner really applies effort', (
   withTemporaryTask('v2-r3-valid.md', (task) => task
     .replace('    default:\n      model: model-executor\n      effort: high', '    default:\n      model: model-variant\n      effort: high')
     .replace('    model: model-executor\n    provider: provider-a\n    effort: high\n    runner: runner-a', '    model: model-variant\n    provider: provider-b\n    effort: high\n    runner: runner-effort')
+    // O revisor troca para o unico frontier provider-a, entao o executor nao
+    // pode manter model-executor em nenhum slot: papeis precisam ser disjuntos.
+    .replaceAll('      model: model-executor\n      effort: max', '      model: model-variant\n      effort: max')
     .replace('      model: model-reviewer\n      provider: provider-b\n      effort: high', '      model: model-executor\n      provider: provider-a\n      effort: high')
     .replace('    default:\n      model: model-reviewer\n      effort: high\nrouting_rationale:', '    default:\n      model: model-executor\n      effort: high\nrouting_rationale:'),
   (result) => {
@@ -469,9 +476,245 @@ test('accepts an effort level the runner does map', () => {
     .replace('    default:\n      model: model-executor\n      effort: high', '    default:\n      model: model-variant\n      effort: high')
     .replace('    model: model-executor\n    provider: provider-a\n    effort: high\n    runner: runner-a',
       '    model: model-variant\n    provider: provider-b\n    effort: high\n    runner: runner-partial')
+    .replaceAll('      model: model-executor\n      effort: max', '      model: model-variant\n      effort: max')
     .replace('      model: model-reviewer\n      provider: provider-b\n      effort: high', '      model: model-executor\n      provider: provider-a\n      effort: high')
     .replace('    default:\n      model: model-reviewer\n      effort: high\nrouting_rationale:', '    default:\n      model: model-executor\n      effort: high\nrouting_rationale:'),
   (result) => {
     assert.equal(result.status, 0, result.stderr);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Item 1 — plan_hash congela o model_plan.
+// ---------------------------------------------------------------------------
+
+function fixtureSource(name) {
+  return readFileSync(path.join(scriptsDirectory, 'fixtures', 'tasks', name), 'utf8');
+}
+
+function runWithFinalCommit(taskPath, finalCommit, routingPath = routingV2) {
+  return spawnSync(process.execPath, [
+    validator, taskPath, '--routing', routingPath, '--final-commit', finalCommit,
+  ], { encoding: 'utf8' });
+}
+
+// Reimplementacao independente da serializacao canonica: ordena as chaves em
+// profundidade e delega o resto ao JSON.stringify. Serve para travar a regra
+// documentada; se o validador divergir, este teste acusa.
+function sortDeep(value) {
+  if (Array.isArray(value)) return value.map(sortDeep);
+  if (value !== null && typeof value === 'object') {
+    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, sortDeep(value[key])]));
+  }
+  return value;
+}
+
+test('item 1: accepts a plan without plan_hash and warns that it is not frozen', () => {
+  const result = validateV2('v2-r3-valid.md');
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stderr, /task\.model_plan\.plan_hash: model_plan is not frozen/);
+});
+
+test('item 1: --write-plan-hash records a hash matching the documented serialization', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-hash-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    const written = spawnSync(process.execPath, [
+      validator, taskPath, '--routing', routingV2, '--write-plan-hash',
+    ], { encoding: 'utf8' });
+    assert.equal(written.status, 0, written.stderr);
+    const match = written.stdout.match(/Wrote plan_hash ([0-9a-f]{64})/);
+    assert.ok(match, written.stdout);
+
+    const plan = parseDocument(fixtureSource('v2-r3-valid.md')).get('model_plan').toJSON();
+    delete plan.plan_hash;
+    const expected = createHash('sha256').update(JSON.stringify(sortDeep(plan))).digest('hex');
+    assert.equal(match[1], expected);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('item 1: a frozen plan validates without the not-frozen warning', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-hash-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    spawnSync(process.execPath, [validator, taskPath, '--routing', routingV2, '--write-plan-hash'], { encoding: 'utf8' });
+    const result = validateV2('v2-r3-valid.md', { taskPath });
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /plan_hash/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('item 1: rejects a frozen plan that changed after hashing', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-hash-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    spawnSync(process.execPath, [validator, taskPath, '--routing', routingV2, '--write-plan-hash'], { encoding: 'utf8' });
+    const tampered = readFileSync(taskPath, 'utf8')
+      .replace('      model: model-tester\n      effort: default', '      model: model-tester\n      effort: high');
+    writeFileSync(taskPath, tampered);
+    const result = validateV2('v2-r3-valid.md', { taskPath });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task\.model_plan\.plan_hash: does not match the model plan contents/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('item 1: rejects a plan_hash that is not a non-empty string', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace('  schema: 2\n', '  schema: 2\n  plan_hash: ""\n'), (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /task\.model_plan\.plan_hash: must be a non-empty sha256 hex string/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 2 — quem testou nao revisa.
+// ---------------------------------------------------------------------------
+
+test('item 2: rejects an approval by the same model that passed the final test', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task
+    .replace('    independent_model: true\n    cross_provider_required: true\n    default:\n      model: model-reviewer\n      effort: high',
+      '    independent_model: true\n    cross_provider_required: true\n    default:\n      model: model-tester\n      effort: high')
+    .replace('      model: model-reviewer\n      provider: provider-b\n      effort: high',
+      '      model: model-tester\n      provider: provider-c\n      effort: high'),
+  (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /must not be approved by the same model that passed the final test \(model-tester\)/);
+  });
+});
+
+test('item 2: accepts an approval by a model other than the tester', () => {
+  const result = validateV2('v2-r3-valid.md');
+  assert.equal(result.status, 0, result.stderr);
+});
+
+// ---------------------------------------------------------------------------
+// Item 3 — SHA curto e SHA completo do mesmo commit.
+// ---------------------------------------------------------------------------
+
+test('item 3: matches a full recorded commit against a short --final-commit', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replaceAll('commit: abc1234', 'commit: abc1234deadbeef'), (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('item 3: matches a short recorded commit against a full --final-commit', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-sha-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('v2-r3-valid.md'));
+    const result = runWithFinalCommit(taskPath, 'abc1234deadbeef');
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('item 3: normalizes SHA in the v1 review path too', () => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-routing-sha-'));
+  try {
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, fixtureSource('r3-valid.md'));
+    const result = runWithFinalCommit(taskPath, 'abc1234deadbeef', routing);
+    assert.equal(result.status, 0, result.stderr);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('item 3: does not treat a shared prefix shorter than 7 hex chars as a match', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replaceAll('commit: abc1234', 'commit: abc123'), (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /requires an approved review of final commit abc1234/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 4 — slot lateral alt3.
+// ---------------------------------------------------------------------------
+
+test('item 4: accepts an execution that records the alt3 lateral slot', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task
+    .replace('    selection: default\n    agent: executor', '    selection: alt3\n    agent: executor')
+    .replace('    model: model-executor\n    provider: provider-a\n    effort: high', '    model: model-executor\n    provider: provider-a\n    effort: max'),
+  (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('item 4: a plan without alt3 stays valid (compatibility)', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
+    '    alt3:\n      model: model-executor\n      effort: max\n',
+    '',
+  ), (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('item 4: alt3 is lateral, so it is not bound by the upgrade-weakness rule', () => {
+  // O default sobe para frontier e os upgrades acompanham; alt3 segue economical.
+  // Se alt3 fosse tratado como upgrade, seria reprovado por ser mais fraco.
+  withTemporaryTask('v2-r1-valid.md', (task) => task
+    .replace('    default:\n      model: model-economical\n      effort: default', '    default:\n      model: model-executor\n      effort: high')
+    .replace('    upgrade_alt1:\n      model: model-tester\n      effort: default', '    upgrade_alt1:\n      model: model-executor\n      effort: high')
+    .replace('    model: model-economical\n    provider: provider-c\n    effort: default', '    model: model-executor\n    provider: provider-a\n    effort: high'),
+  (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 5 — um modelo nao se repete entre papeis.
+// ---------------------------------------------------------------------------
+
+test('item 5: rejects one model declared in two different roles', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
+    '    default:\n      model: model-tester\n      effort: default',
+    '    default:\n      model: model-executor\n      effort: high'),
+  (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /is already planned for the executor role/);
+  });
+});
+
+test('item 5: allows the same model to repeat inside one role', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
+    '    default:\n      model: model-tester\n      effort: default\n  reviewer:',
+    '    default:\n      model: model-tester\n      effort: default\n    alt1:\n      model: model-tester\n      effort: high\n  reviewer:'),
+  (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Item 6 — aviso de fonte unica em papel de gate.
+// ---------------------------------------------------------------------------
+
+test('item 6: warns when every tester slot uses the same provider', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
+    '    default:\n      model: model-tester\n      effort: default\n  reviewer:',
+    '    default:\n      model: model-tester\n      effort: default\n    alt1:\n      model: model-economical\n      effort: high\n  reviewer:'),
+  (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /every tester slot resolves to provider provider-c/);
+  });
+});
+
+test('item 6: warns when every reviewer slot uses the same provider', () => {
+  withTemporaryTask('v2-r1-valid.md', (task) => task.replace(
+    '    default:\n      model: model-reviewer\n      effort: default',
+    '    default:\n      model: model-reviewer\n      effort: default\n    alt1:\n      model: model-reviewer\n      effort: low'),
+  (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.match(result.stderr, /every reviewer slot resolves to provider provider-b/);
+  });
+});
+
+

@@ -24,13 +24,16 @@ model_plan:
       model: model-executor
       effort: high
     alt1:
-      model: model-reviewer
+      model: model-variant
       effort: high
     alt2:
       model: model-executor
       effort: max
+    alt3:
+      model: model-executor
+      effort: max
     upgrade_alt1:
-      model: model-reviewer
+      model: model-variant
       effort: max
     upgrade_alt2:
       model: model-executor
