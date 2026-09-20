@@ -13,6 +13,7 @@
     "scripts/validate-task-routing.mjs",
     "scripts/migrate-task-routing.mjs",
     "scripts/migrate-routing.mjs",
+    "scripts/sync-routing.mjs",
     "MODEL_REQUIREMENTS.md",
     "VERSION"
   ],

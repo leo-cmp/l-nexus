@@ -424,6 +424,33 @@ deve ser dito, não disfarçado.
 **Limite declarado:** `.lnx/` não entra no git, então isso vale na máquina que
 executou — que é onde o gate roda, mas significa que CI não reconfere depois.
 
+### Sincronizar o catálogo com o kit
+
+O `.ai/model-routing.yaml` pertence ao projeto e nunca é sobrescrito: o
+`install` só copia quando ele não existe, e o `migrate-routing` migra schema, não
+conteúdo. O efeito colateral é que **nada propagava catálogo** — já aconteceu de
+um projeto ficar sete modelos à frente do kit, com a sincronização feita à mão.
+
+A causa é que o arquivo mistura quatro donos. `models` é do mundo; `work_routes`,
+`profiles`, `routes` e `execution_policy` são do kit; `project_policy` e
+`risk_domains.project` são do projeto; `cli_runners`, `terminal_runners` e
+`runner_policy` descrevem a máquina. Para proteger as duas últimas categorias,
+congelou-se o arquivo inteiro.
+
+```bash
+npx @leo-cmp/l-nexus sync-routing            # dry-run: diz o que mudaria
+npx @leo-cmp/l-nexus sync-routing --write    # aplica
+```
+
+Ele troca as duas primeiras categorias e não encosta nas outras duas. O dry-run é
+o padrão e resume por chave — quais modelos entram, saem ou mudam — em vez de
+despejar setecentas linhas de diff. Seção local que o kit desconhece fica intacta
+e é anunciada. Schema divergente é recusado com o aviso de rodar o
+`migrate-routing` antes.
+
+Os comentários do kit viajam junto com as seções que ele governa: a
+justificativa de uma rota vale tanto quanto a rota.
+
 Para converter o front matter de uma task legada sem inventar identidades de
 executor ou revisor, simule primeiro e aplique explicitamente:
 
