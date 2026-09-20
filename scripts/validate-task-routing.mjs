@@ -287,6 +287,19 @@ function validateRunEvidence(entry, field, context, errors, warnings) {
     }
   }
 
+  // Mesmo raciocinio do observed-model, mas para o esforco: um seletor de
+  // dashboard no gateway do proxy repassa ou sobrescreve o esforco pedido, e
+  // essa configuracao nao aparece nem no kit nem no registro da task. Sem isso,
+  // uma task poderia declarar effort: high e ter rodado em low sem denuncia.
+  const observedEffortPath = path.join(runDirectory, 'observed-effort');
+  if (existsSync(observedEffortPath)) {
+    const observedEffort = readFileSync(observedEffortPath, 'utf8').trim();
+    if (observedEffort !== '' && entry.effort !== undefined && observedEffort !== String(entry.effort)) {
+      addError(errors, `${field}.run_id`,
+        `ran at effort ${observedEffort}, not at the declared ${entry.effort}; the runner reported what was actually applied`);
+    }
+  }
+
   const startedAt = parseLooseTimestamp(meta.started_at);
   const declared = parseLooseTimestamp(declaredAt);
   if (startedAt !== null && declared !== null && startedAt - declared > RUN_CLOCK_TOLERANCE_MS) {

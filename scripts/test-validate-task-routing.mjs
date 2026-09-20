@@ -855,7 +855,7 @@ test('git witness: warns when no committed version predates the execution record
 // dele — que e tambem o caminho que a busca por .lnx/runtime percorre.
 const RUN_ID = '20260816T102500Z-reviewer-1-4242';
 
-function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', observedModel = null, patch = (task) => task }, assertions) {
+function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', observedModel = null, observedEffort = null, patch = (task) => task }, assertions) {
   const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-run-'));
   try {
     const taskPath = path.join(directory, 'task.md');
@@ -876,6 +876,7 @@ function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', observedMode
     }, null, 2));
     if (exitCode !== null) writeFileSync(path.join(runDirectory, 'exit-code'), `${exitCode}\n`);
     if (observedModel !== null) writeFileSync(path.join(runDirectory, 'observed-model'), `${observedModel}\n`);
+    if (observedEffort !== null) writeFileSync(path.join(runDirectory, 'observed-effort'), `${observedEffort}\n`);
     assertions(validateV2('v2-r3-valid.md', { taskPath }), runDirectory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -943,6 +944,22 @@ test('run evidence: rejects a run served by a model other than the declared one'
   withRunRecord({ observedModel: 'model-variant', patch: withReviewRunId(RUN_ID) }, (result) => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /ran on model-variant, not on the declared model-reviewer/);
+  });
+});
+
+test('run evidence: accepts a run whose observed effort is the declared one', () => {
+  withRunRecord({ observedEffort: 'high', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('run evidence: rejects a run applied at an effort other than the declared one', () => {
+  // O mesmo caso do modelo, um nivel abaixo: a task declara effort: high, o
+  // registro do run concorda, mas o seletor de dashboard do proxy do gateway
+  // sobrescreveu o esforco pedido -- invisivel para o kit e para a task.
+  withRunRecord({ observedEffort: 'low', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ran at effort low, not at the declared high/);
   });
 });
 

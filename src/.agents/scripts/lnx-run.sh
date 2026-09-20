@@ -63,6 +63,11 @@ Run directory contract:
   observed-model  which model actually answered, when a runner can report it.
                   Written by --observe-bin, whose argv takes {run_dir} and
                   {output_log}. Best-effort: its failure never fails the run.
+  observed-effort  which reasoning effort was actually applied, when the
+                  observer reports it. Same --observe-bin, second line of
+                  output: line 1 is the model, line 2 (optional) is the
+                  effort. An observer that only prints one line still works
+                  exactly as before; observed-effort is simply not written.
 USAGE
 }
 
@@ -298,11 +303,20 @@ command_supervise() {
     # ausencia da evidencia ja e a informacao, e perder o trabalho do agente por
     # causa dela seria trocar um problema por outro maior.
     if [ -f "$run_dir/observe.argv" ]; then
-        local observe_argv=() observed=''
+        local observe_argv=() observe_out='' observed='' observed_effort=''
         mapfile -d '' -t observe_argv < "$run_dir/observe.argv"
         if [ "${#observe_argv[@]}" -gt 0 ]; then
-            observed="$("${observe_argv[@]}" 2>/dev/null | head -n 1 | tr -d '\r')"
+            observe_out="$("${observe_argv[@]}" 2>/dev/null)"
+            observed="$(printf '%s\n' "$observe_out" | sed -n '1p' | tr -d '\r')"
             [ -n "$observed" ] && write_state "$run_dir/observed-model" "$observed"
+
+            # O nivel de esforco pode ser sobrescrito num seletor de dashboard do
+            # proxy, invisivel para o kit e para o registro da task: a task pode
+            # declarar effort: high e ter rodado em low sem que nada acuse. A
+            # segunda linha e opcional de proposito -- observador que so imprime
+            # o modelo continua funcionando exatamente como antes, sem esse arquivo.
+            observed_effort="$(printf '%s\n' "$observe_out" | sed -n '2p' | tr -d '\r')"
+            [ -n "$observed_effort" ] && write_state "$run_dir/observed-effort" "$observed_effort"
         fi
     fi
 

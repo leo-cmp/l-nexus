@@ -475,4 +475,46 @@ headless "$RUNNER" start --task TASK-OBS3 --role reviewer --runner fake \
     --observe-bin definitely-not-installed 2>/dev/null &&
     fail "start accepted an --observe-bin that is not installed"
 
+# --- registrar tambem QUAL ESFORCO foi aplicado, nao so quem atendeu -------
+#
+# O mesmo problema do modelo existe um nivel abaixo: o gateway do proxy tem um
+# seletor de dashboard que ou repassa o esforco pedido ou o sobrescreve com um
+# valor fixo, e isso e invisivel para o kit. Por isso a segunda linha do
+# observador, quando existe, vira observed-effort.
+
+cat > "$BIN/fake-observer-effort" <<'OBSERVER'
+#!/usr/bin/env bash
+# Recebe o diretorio do run e devolve modelo (linha 1) e esforco (linha 2).
+grep -o 'SERVED=[a-z0-9-]*' "$1/output.log" | head -1 | cut -d= -f2
+echo "low"
+OBSERVER
+chmod +x "$BIN/fake-observer-effort"
+
+output="$(headless "$RUNNER" start --task TASK-OBS4 --role reviewer --runner fake \
+    --runner-bin fake-fallback-agent --model modelo-pedido --effort high --cwd "$PROJECT" \
+    --fallback inline --hold never \
+    --observe-bin fake-observer-effort --observe-arg '{run_dir}' 2>&1)"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output" | head -1)"
+[ -n "$run_dir" ] || fail "start with a two-line observer did not report a run directory"
+observed="$(cat "$run_dir/observed-model" 2>/dev/null || echo MISSING)"
+[ "$observed" = "outro-modelo-qualquer" ] ||
+    fail "the two-line observer did not record the model on line 1: $observed"
+observed_effort="$(cat "$run_dir/observed-effort" 2>/dev/null || echo MISSING)"
+[ "$observed_effort" = "low" ] ||
+    fail "the two-line observer did not record the effort on line 2: $observed_effort"
+
+# Um observador que so imprime uma linha (o contrato de antes) precisa continuar
+# funcionando exatamente como antes: observed-model gravado, observed-effort
+# nem criado.
+output="$(headless "$RUNNER" start --task TASK-OBS5 --role reviewer --runner fake \
+    --runner-bin fake-fallback-agent --model modelo-pedido --effort high --cwd "$PROJECT" \
+    --fallback inline --hold never \
+    --observe-bin fake-observer --observe-arg '{run_dir}' 2>&1)"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output" | head -1)"
+observed="$(cat "$run_dir/observed-model" 2>/dev/null || echo MISSING)"
+[ "$observed" = "outro-modelo-qualquer" ] ||
+    fail "a one-line observer stopped recording the model: $observed"
+[ -f "$run_dir/observed-effort" ] &&
+    fail "a one-line observer created observed-effort out of thin air"
+
 echo "scripts/test-lnx-run.sh: ok"

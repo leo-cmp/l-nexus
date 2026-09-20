@@ -111,6 +111,30 @@ O comando imprime, na primeira linha, o modelo que respondeu. O `lnx-run.sh`
 grava isso em `observed-model` no diretório do run, e o `validate-task` recusa a
 entrada cujo modelo declarado não bate com o observado.
 
+### E quem decidiu o esforço (`observed-effort`)
+
+O mesmo problema existe um nível abaixo, só que sem o mesmo remédio: medido
+neste projeto em 2026-09-20, o gateway do proxy tem um seletor — configuração
+de dashboard, não de código — que tanto pode **repassar** o esforço pedido pelo
+cliente quanto **sobrescrevê-lo** com um valor fixo. Esse seletor é invisível
+para o kit e para o registro da task. Uma entrada pode declarar `effort: high`,
+ter rodado de fato em `low`, e nada no YAML acusa.
+
+Por isso o contrato de saída do observador passou a ser de **duas linhas**: a
+primeira continua sendo o modelo; a segunda, opcional, é o nível de esforço
+efetivamente aplicado.
+
+```
+claude-opus-4
+high
+```
+
+Um observador que só sabe reportar o modelo continua funcionando exatamente
+como antes — a segunda linha é opcional, e sem ela o `lnx-run.sh` simplesmente
+não grava `observed-effort`. Quando ela existe e o `entry.effort` está
+declarado, o `validate-task` compara os dois e recusa a divergência, do mesmo
+jeito que já faz para `observed-model`.
+
 Três regras:
 
 - é **best-effort**. Observador que falha não derruba a execução: a ausência da
