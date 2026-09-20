@@ -5,6 +5,9 @@
   "bin": {
     "l-nexus": "scripts/cli.mjs"
   },
+  "scripts": {
+    "test": "bash scripts/run-all-tests.sh"
+  },
   "files": [
     "src/",
     "scripts/cli.mjs",
