@@ -127,19 +127,24 @@ negócio privada — inclusive o projeto `clp`.
 
 ## Pendente
 
-1. **Push e PR.** 9 commits locais.
-2. **Combos**: fechar o prefixo (`r9-` ou `9r-`), definir os membros de cada
-   pool, escrever as entradas de catálogo (perfil = piso do pool, capacidades =
-   interseção, evidência com a ressalva do Auto) e trocar os defaults das dez
-   rotas. `r9-frontier-tester` está com `models: []`.
-3. **Observador capturando o nível de raciocínio** junto com o modelo. É o que
-   faria a mudança daquele seletor deixar rastro na task.
-4. **`npm test` e CI.** São 14 suítes e nenhuma roda automaticamente; o
-   `publish.yml` publica no push da tag sem rodar teste. *(Em andamento.)*
-5. **`sync-routing` no fluxo da skill de update.** *(Em andamento.)*
-6. **Release.** Versão em 0.11.2, falta bump e tag.
-7. **Propagar para `/home/leo/Dev/my-projects/dentroo/clp`**, que tem o PR #88
+Tudo o que sobrou depende de decisão sua. O código está fechado e verde.
+
+1. **Push e PR.** 13 commits locais, nada enviado.
+2. **Combos.** Prefixo decidido: **`9r-`**. Os `r9-*` que existem no 9router hoje
+   são teste descartável — os pools de verdade ainda vão ser criados. Com eles
+   definidos, falta escrever as entradas de catálogo (perfil = piso do pool,
+   capacidades = interseção, evidência registrando que o perfil só vale com o
+   gateway em **Auto**) e trocar os defaults das dez rotas.
+3. **Release.** Versão em 0.11.2, falta bump e tag. Agora com rede: o
+   `publish.yml` roda as 14 suítes antes do `npm publish`.
+4. **Propagar para `/home/leo/Dev/my-projects/dentroo/clp`**, que tem o PR #88
    aberto em assunto separado.
+
+Concluído nesta sessão, para não voltar à lista: o plano congelado com git como
+testemunha, o gate conferido contra o registro de execução, o modelo servido e o
+esforço aplicado medidos onde a CLI coopera, o `sync-routing` e sua entrada na
+skill de update, as seis regras propagadas para as guidelines, o `npm test`
+cobrindo as 14 suítes e a CI rodando elas antes de publicar.
 
 ---
 
