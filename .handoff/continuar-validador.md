@@ -4,7 +4,7 @@
 > Atualizado em 2026-09-20, substituindo a versão anterior, que ficou falsa.
 
 Branch: `feat/congelar-plano-e-propagar-regras`.
-**9 commits, árvore limpa, nada enviado.** Não há trabalho pendente na árvore.
+**Árvore limpa, `npm test` verde, nada enviado.** Todos os commits são locais.
 
 ---
 
@@ -48,9 +48,11 @@ que o `lnx-run.sh` gravou e confere: que existe, que é **desta** task (pega
 há `exit-code`, e que o run não começou depois do parecer. Ausente é aviso, e só
 quando o gate é obrigatório. Divergente é erro.
 
-**3. Onde a CLI coopera, o modelo servido é medido.** `--observe-bin` recebe o
-diretório do run e imprime quem de fato atendeu; o validador recusa a entrada
-que declara outro. Best-effort: observador que falha não derruba a execução.
+**3. Onde a CLI coopera, o que rodou é medido.** `--observe-bin` recebe o
+diretório do run e imprime, na primeira linha, quem de fato atendeu e, na
+segunda (opcional), com que esforço. O validador recusa a entrada que declara
+outro modelo ou outro esforço. Observador de uma linha só continua funcionando.
+Best-effort: observador que falha não derruba a execução.
 
 Mais: as seis regras que existiam só no código foram para as guidelines (era
 armadilha: o Planner escrevia task que o validador recusava sem nenhum documento
