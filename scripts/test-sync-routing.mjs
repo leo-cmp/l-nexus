@@ -142,3 +142,27 @@ test('the synced file still satisfies the shipped-routing rules', () => {
     assert.equal(result.status, 0, result.stderr);
   });
 });
+
+test('cli_runners merges: the kit updates what it knows and keeps what it does not', () => {
+  // Descoberto na primeira propagacao real. Preservar cli_runners inteiro
+  // deixava o projeto com rotas apontando para runners que ele nao tinha, e
+  // mantinha uma declaracao de esforco que o kit ja havia corrigido por ser
+  // falsa. Sobrescrever inteiro apagaria runner local. Mesclar e o unico
+  // comportamento em que nada se perde e a correcao chega.
+  withProjectRouting((source) => source
+    // projeto atrasado: sem o runner novo do kit...
+    .replace(/\n  opencode-muse:\n(?:    .*\n|      .*\n|\n)*?(?=  [a-z0-9-]+:\n)/, '\n')
+    // ...com uma declaracao velha no runner que ambos tem...
+    .replace('  opencode:\n    binary: "opencode"', '  opencode:\n    binary: "opencode-antigo"')
+    // ...e com um runner que so ele conhece, DENTRO de cli_runners: anexar no
+    // fim do arquivo o poria dentro de terminal_runners, que vem depois.
+    .replace('cli_runners:\n', 'cli_runners:\n  runner-caseiro:\n    binary: "meu-script"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n'),
+  ({ run, parsed }) => {
+    const result = run('--write');
+    assert.equal(result.status, 0, result.stderr);
+    const runners = parsed().cli_runners;
+    assert.ok(runners['opencode-muse'], 'o runner que so o kit tinha nao chegou ao projeto');
+    assert.equal(runners.opencode.binary, 'opencode', 'a entrada desatualizada do projeto nao foi corrigida');
+    assert.equal(runners['runner-caseiro'].binary, 'meu-script', 'o runner local foi apagado');
+  });
+});

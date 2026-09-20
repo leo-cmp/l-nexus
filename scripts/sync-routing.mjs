@@ -32,7 +32,18 @@ const SHIPPED_ROUTING = path.join(scriptDirectory, '..', 'src', '.ai', 'model-ro
 const SYNCED = ['schema_version', 'profiles', 'models', 'routes', 'execution_policy', 'work_routes'];
 
 // O que e do projeto e da maquina. Nunca tocado.
-const PRESERVED = ['project_policy', 'runner_policy', 'cli_runners', 'terminal_runners'];
+const PRESERVED = ['project_policy', 'runner_policy', 'terminal_runners'];
+
+// cli_runners nao cabe em nenhuma das duas categorias, e tratar como uma delas
+// quebra de um jeito ou de outro. QUAIS binarios existem e da maquina; o argv, o
+// prompt_delivery e o mapping de esforco sao conhecimento do KIT. Preservar
+// inteiro deixou um projeto real com rotas apontando para pools sem os runners
+// que elas precisam, e mantendo uma declaracao de esforco que o kit ja tinha
+// corrigido por ser falsa. Sobrescrever inteiro apagaria runner local.
+//
+// Entao: entrada que o kit conhece e atualizada, entrada que so o projeto tem
+// fica intacta. Nada se perde e a correcao chega.
+const MERGED = ['cli_runners'];
 
 // risk_domains tem os dois donos na mesma secao: a lista generica e do kit, a
 // do projeto e do projeto. E a unica que precisa ser costurada chave a chave.
@@ -46,6 +57,7 @@ function usage() {
 Propaga catalogo e rotas do kit para o roteamento de um projeto.
 
 Sincroniza : ${SYNCED.join(', ')}, risk_domains.${RISK_DOMAINS_FROM_KIT.join('/')}
+Mescla     : ${MERGED.join(', ')} -- entrada do kit atualiza, entrada local fica
 Preserva   : ${PRESERVED.join(', ')}, risk_domains.project
 
 O padrao e dry-run: mostra o que mudaria e nao escreve nada. Use --write para
@@ -159,6 +171,15 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
     replacePair(projeto, kit, chave);
   }
 
+  for (const chave of MERGED) {
+    const doKit = kit.get(chave, true);
+    if (doKit === undefined) continue;
+    if (!projeto.has(chave)) { replacePair(projeto, kit, chave); continue; }
+    for (const item of doKit.items ?? []) {
+      projeto.setIn([chave, String(item.key)], item.value);
+    }
+  }
+
   // risk_domains: so as listas do kit, preservando o que o projeto acrescentou.
   const kitRisk = kit.get('risk_domains', true);
   if (kitRisk) {
@@ -183,12 +204,17 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
     linhas.push('risk_domains.generic_r3: atualizado');
   }
 
+  for (const chave of MERGED) {
+    describeMapping(`${chave} (mesclado)`, antes[chave], depois[chave], linhas);
+  }
+
   const preservadas = PRESERVED.filter((chave) => antes[chave] !== undefined);
   // Uma secao que o projeto tem e o kit desconhece nao e erro: pode ser
   // configuracao local legitima. Ela fica onde esta, e e dita em voz alta para
   // ninguem descobrir depois que o comando passou por cima de algo.
   const desconhecidas = Object.keys(antes).filter(
-    (chave) => !SYNCED.includes(chave) && !PRESERVED.includes(chave) && chave !== 'risk_domains',
+    (chave) => !SYNCED.includes(chave) && !PRESERVED.includes(chave)
+      && !MERGED.includes(chave) && chave !== 'risk_domains',
   );
 
   return {
