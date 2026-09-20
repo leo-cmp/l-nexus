@@ -1,0 +1,29 @@
+name: Tests
+
+# O publish.yml ja roda as suites, mas so no push da tag -- o que protege a
+# publicacao e nao o merge. Sem isto, codigo entra no main sem nada ter rodado, e
+# a tag so descobre o problema quando ja e tarde.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # As suites de roteamento comparam o plano de uma task com a versao
+          # dele no commit que a introduziu. Com o checkout raso padrao esse
+          # commit pode nao existir localmente, e a checagem viraria aviso em vez
+          # de erro -- verde por falta de historico, nao por estar correto.
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - run: npm ci
+
+      - run: npm test
