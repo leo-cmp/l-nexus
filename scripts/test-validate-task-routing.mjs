@@ -855,7 +855,7 @@ test('git witness: warns when no committed version predates the execution record
 // dele — que e tambem o caminho que a busca por .lnx/runtime percorre.
 const RUN_ID = '20260816T102500Z-reviewer-1-4242';
 
-function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', patch = (task) => task }, assertions) {
+function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', observedModel = null, patch = (task) => task }, assertions) {
   const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-run-'));
   try {
     const taskPath = path.join(directory, 'task.md');
@@ -875,6 +875,7 @@ function withRunRecord({ runId = RUN_ID, meta = {}, exitCode = '0', patch = (tas
       ...meta,
     }, null, 2));
     if (exitCode !== null) writeFileSync(path.join(runDirectory, 'exit-code'), `${exitCode}\n`);
+    if (observedModel !== null) writeFileSync(path.join(runDirectory, 'observed-model'), `${observedModel}\n`);
     assertions(validateV2('v2-r3-valid.md', { taskPath }), runDirectory);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -926,6 +927,22 @@ test('run evidence: rejects a run that never finished', () => {
   withRunRecord({ exitCode: null, patch: withReviewRunId(RUN_ID) }, (result) => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /without exit-code, so the run never finished/);
+  });
+});
+
+test('run evidence: accepts a run whose observed model is the declared one', () => {
+  withRunRecord({ observedModel: 'model-reviewer', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('run evidence: rejects a run served by a model other than the declared one', () => {
+  // O caso que nenhuma outra checagem alcanca: a task declara o modelo certo, o
+  // registro do run concorda, e ainda assim quem atendeu foi outro -- porque a
+  // CLI caiu para um fallback ou o proxy trocou por cota. So quem executou sabe.
+  withRunRecord({ observedModel: 'model-variant', patch: withReviewRunId(RUN_ID) }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ran on model-variant, not on the declared model-reviewer/);
   });
 });
 

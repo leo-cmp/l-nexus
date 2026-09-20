@@ -413,6 +413,14 @@ Ausente é **aviso**, e só quando o gate é obrigatório. Divergente é **erro*
 Mentir custava uma linha de YAML; agora custa fabricar uma árvore de arquivos
 com carimbos que o agente não emite.
 
+Há ainda uma camada acima: **quem atendeu não é necessariamente quem foi
+pedido**. Uma CLI com fallback troca de modelo sozinha quando o primário está
+sobrecarregado, e um proxy troca quando a cota acaba. Quando o runner sabe
+reportar o modelo que respondeu, o `lnx-run.sh` grava esse valor e o validador
+recusa a entrada que declara outro. Nem toda CLI sabe: por isso o observador é
+configurável por runner, e um runner sem ele produz gate que vale menos — o que
+deve ser dito, não disfarçado.
+
 **Limite declarado:** `.lnx/` não entra no git, então isso vale na máquina que
 executou — que é onde o gate roda, mas significa que CI não reconfere depois.
 

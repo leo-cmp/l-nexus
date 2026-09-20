@@ -68,9 +68,54 @@ cli_runners:
       mapping: { low: ..., high: ..., max: ... }
     env:                                       # ambiente desta execução (ver abaixo)
       ANTHROPIC_BASE_URL: "http://localhost:PORTA/v1"
+    observed_model:                            # como descobrir quem atendeu
+      bin: "<comando>"
+      argv: ["{run_dir}"]
 ```
 
-Placeholders: `{prompt}`, `{model}`, `{effort}`.
+Placeholders: `{prompt}`, `{model}`, `{effort}` no runner; `{run_dir}` e
+`{output_log}` no observador.
+
+### Quem atendeu (`observed_model`)
+
+Quem **atendeu** não é necessariamente quem foi **pedido**. Uma CLI com fallback
+troca de modelo sozinha quando o primário está sobrecarregado; um proxy troca
+quando a cota acaba. Nos dois casos o registro da task diria o modelo pedido, e
+estaria errado sem ninguém perceber.
+
+Nem toda CLI sabe contar qual foi. Medido em 2026-09-20, com prompt mínimo e
+saída JSON:
+
+| CLI | reporta? | onde |
+|---|---|---|
+| `claude` | sim | `modelUsage.<modelo>.canonicalModel`, com `provider` |
+| `agy` | não | o JSON traz conversa, status, duração e tokens, sem modelo |
+| `opencode` | não | nenhum campo de model ou provider em nenhum evento |
+
+Por isso o observador é **opcional e por runner**: o kit define onde a evidência
+mora, a máquina define como obtê-la — e assim o kit não ganha dependência nova
+nem conhecimento sobre CLI nenhuma.
+
+```yaml
+observed_model:
+  bin: "<comando>"
+  argv: ["{run_dir}"]      # tambem aceita {output_log}
+```
+
+O comando imprime, na primeira linha, o modelo que respondeu. O `lnx-run.sh`
+grava isso em `observed-model` no diretório do run, e o `validate-task` recusa a
+entrada cujo modelo declarado não bate com o observado.
+
+Três regras:
+
+- é **best-effort**. Observador que falha não derruba a execução: a ausência da
+  evidência já é a informação, e perder o trabalho do agente por causa dela
+  seria trocar um problema por outro maior;
+- runner que não sabe reportar fica sem observador, e o gate dele vale menos —
+  **diga isso**, não finja equivalência;
+- extrair o modelo costuma exigir que a CLI rode em modo JSON, o que muda o que
+  aparece na tela. Num terminal visível que o humano acompanha, isso é um
+  custo real: pondere entre ver o agente trabalhando e poder provar quem era.
 
 ### Ambiente por execução (`env`)
 

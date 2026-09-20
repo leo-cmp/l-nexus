@@ -464,4 +464,52 @@ headless "$RUNNER" start --task TASK-ENV2 --role executor --runner fake \
     --env "NOT VALID=1" 2>/dev/null &&
     fail "start accepted an --env with an invalid variable name"
 
+# --- registrar QUEM atendeu, nao so quem foi pedido ------------------------
+#
+# Uma CLI com fallback troca de modelo sozinha quando o primario esta
+# sobrecarregado; um proxy troca quando a cota acaba. Das CLIs instaladas, so
+# uma sabe reportar isso, entao o observador e opcional e a extracao pertence a
+# maquina -- o kit so define onde a evidencia mora.
+
+cat > "$BIN/fake-observer" <<'OBSERVER'
+#!/usr/bin/env bash
+# Recebe o diretorio do run e devolve o modelo que de fato respondeu.
+grep -o 'SERVED=[a-z0-9-]*' "$1/output.log" | head -1 | cut -d= -f2
+OBSERVER
+chmod +x "$BIN/fake-observer"
+
+cat > "$BIN/fake-fallback-agent" <<'AGENT'
+#!/usr/bin/env bash
+echo "SERVED=outro-modelo-qualquer"
+AGENT
+chmod +x "$BIN/fake-fallback-agent"
+
+output="$(headless "$RUNNER" start --task TASK-OBS --role reviewer --runner fake \
+    --runner-bin fake-fallback-agent --model modelo-pedido --cwd "$PROJECT" \
+    --fallback inline --hold never \
+    --observe-bin fake-observer --observe-arg '{run_dir}' 2>&1)"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output" | head -1)"
+[ -n "$run_dir" ] || fail "start with --observe-bin did not report a run directory"
+observed="$(cat "$run_dir/observed-model" 2>/dev/null || echo MISSING)"
+[ "$observed" = "outro-modelo-qualquer" ] ||
+    fail "the observer did not record the model that answered: $observed"
+grep -q '"model": "modelo-pedido"' "$run_dir/meta.json" ||
+    fail "meta.json lost the requested model"
+
+# Observador que falha nao derruba a execucao: a ausencia da evidencia ja e a
+# informacao, e perder o trabalho do agente por causa dela seria pior.
+output="$(headless "$RUNNER" start --task TASK-OBS2 --role reviewer --runner fake \
+    --runner-bin fake-agent --cwd "$PROJECT" --fallback inline --hold never \
+    --observe-bin fake-observer --observe-arg /caminho/que/nao/existe 2>&1)"
+run_dir="$(sed -n 's/^run_dir=//p' <<<"$output" | head -1)"
+[ "$(cat "$run_dir/exit-code" 2>/dev/null)" = "0" ] ||
+    fail "a failing observer changed the run result"
+[ -f "$run_dir/observed-model" ] &&
+    fail "a failing observer wrote an observed model anyway"
+
+headless "$RUNNER" start --task TASK-OBS3 --role reviewer --runner fake \
+    --runner-bin fake-agent --cwd "$PROJECT" --fallback inline --hold never \
+    --observe-bin definitely-not-installed 2>/dev/null &&
+    fail "start accepted an --observe-bin that is not installed"
+
 echo "scripts/test-lnx-run.sh: ok"

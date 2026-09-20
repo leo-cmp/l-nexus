@@ -275,6 +275,18 @@ function validateRunEvidence(entry, field, context, errors, warnings) {
     addError(errors, `${field}.run_id`, 'has a run record without exit-code, so the run never finished');
   }
 
+  // Quem atendeu nao e necessariamente quem foi pedido: CLI com fallback e
+  // proxy com rodizio trocam de modelo sozinhos. Quando o runner sabe reportar,
+  // o observado vale mais que o declarado — foi medido, nao afirmado.
+  const observedPath = path.join(runDirectory, 'observed-model');
+  if (existsSync(observedPath)) {
+    const observed = readFileSync(observedPath, 'utf8').trim();
+    if (observed !== '' && entry.model !== undefined && observed !== String(entry.model)) {
+      addError(errors, `${field}.run_id`,
+        `ran on ${observed}, not on the declared ${entry.model}; the runner reported what actually answered`);
+    }
+  }
+
   const startedAt = parseLooseTimestamp(meta.started_at);
   const declared = parseLooseTimestamp(declaredAt);
   if (startedAt !== null && declared !== null && startedAt - declared > RUN_CLOCK_TOLERANCE_MS) {
