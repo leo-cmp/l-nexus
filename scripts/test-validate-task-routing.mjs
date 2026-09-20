@@ -286,13 +286,87 @@ test('rejects a slot model that lacks a required capability', () => {
   });
 });
 
-test('rejects a slot model that is not active in the catalog', () => {
+// A fixture v2-r3-valid ja nasce com `state: done`, e uma task fechada passou a
+// ser auditada e nao planejada. Para continuar provando a regra dura este teste
+// abre a task: o que ele sempre quis afirmar e que NAO SE PLANEJA num modelo
+// morto, e so a task aberta esta planejando. O caso fechado ganhou teste
+// proprio logo abaixo, entao a regra saiu daqui com mais cobertura, nao menos.
+test('rejects a slot model that is not active in the catalog while the task is open', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task
+    .replace('  state: done', '  state: executing')
+    .replace(
+      '    alt1:\n      model: model-variant\n      effort: high',
+      '    alt1:\n      model: model-retired\n      effort: high',
+    ), (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /executor\.alt1\.model: must reference an active routing\.models entry \(model-retired\)/);
+  });
+});
+
+// Eixo temporal: o catalogo aposenta um modelo depois que a task fechou. O
+// registro nao mudou, o mundo mudou. Reprovar aqui obrigaria a reescrever o
+// historico para ficar verde.
+test('accepts a slot model retired after the task closed, and says so in a warning', () => {
   withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
     '    alt1:\n      model: model-variant\n      effort: high',
     '    alt1:\n      model: model-retired\n      effort: high',
   ), (result) => {
+    assert.equal(result.status, 0, result.stderr);
+    assert.doesNotMatch(result.stderr, /must reference an active routing\.models entry/);
+    assert.match(result.stderr, /warning: task\.model_plan\.executor\.alt1\.model: model-retired is deprecated, not active, in the catalog; it was retired after this task closed/);
+  });
+});
+
+// A flexibilizacao vale so para o status. Um modelo que nao esta no catalogo
+// continua erro numa task fechada: aposentado e um modelo que foi avaliado e
+// envelheceu, e desconhecido e um modelo sobre o qual o projeto nunca soube
+// nada. Sem esta fronteira, `state: done` viraria licenca para inventar modelo.
+test('still rejects an uncatalogued slot model in a closed task', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
+    '    alt1:\n      model: model-variant\n      effort: high',
+    '    alt1:\n      model: model-invented\n      effort: high',
+  ), (result) => {
     assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /executor\.alt1\.model: must reference an active routing\.models entry \(model-retired\)/);
+    assert.match(result.stderr, /executor\.alt1\.model: must reference a configured routing\.models entry \(model-invented\)/);
+  });
+});
+
+// O resto do contrato do catalogo nao afrouxa junto. O modelo aposentado ainda
+// tem que sustentar o piso de perfil do papel: a task fechada pode registrar um
+// modelo morto, nao um modelo fraco demais para o trabalho que ela afirma ter
+// feito.
+test('still enforces the required profile floor on a retired model in a closed task', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task.replace(
+    '    alt1:\n      model: model-variant\n      effort: high',
+    '    alt1:\n      model: model-retired\n      effort: low',
+  ), (result, temporaryDirectory) => {
+    const routingPath = path.join(temporaryDirectory, 'model-routing.yaml');
+    writeFileSync(routingPath, readFileSync(routingV2, 'utf8').replace(
+      '  model-retired:\n    provider: provider-a\n    profile: frontier\n    profile_by_variant:\n      default: frontier\n      low: frontier',
+      '  model-retired:\n    provider: provider-a\n    profile: frontier\n    profile_by_variant:\n      default: frontier\n      low: economical',
+    ));
+    const downgraded = validateV2('v2-r3-valid.md', {
+      taskPath: path.join(temporaryDirectory, 'task.md'),
+      routingPath,
+    });
+    assert.notEqual(downgraded.status, 0, downgraded.stderr);
+    assert.match(downgraded.stderr, /resolves to profile economical, below required frontier/);
+    // A ausencia desta mensagem e o que prende o teste a flexibilizacao: prova
+    // que o status foi dispensado e que o piso reprovou sozinho, e nao que os
+    // dois reprovaram juntos e um deles carregou o resultado.
+    assert.doesNotMatch(downgraded.stderr, /must reference an active routing\.models entry/);
+  });
+});
+
+// Fechar a task e um campo que o proprio agente escreve, entao a pergunta certa
+// nao e "da para forjar `state: done`" (da) e sim "o que isso compra". Compra
+// poder nomear um modelo que o catalogo aposentou -- e nada mais: nenhum gate e
+// pulado. Este teste fixa essa fronteira pelo lado que importa, o do gate.
+test('closing a task does not waive the review gate', () => {
+  withTemporaryTask('v2-r3-valid.md', (task) => task
+    .replace('      verdict: approved', '      verdict: rejected'), (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /requires an approved review of final commit abc1234/);
   });
 });
 

@@ -461,6 +461,18 @@ function validateCatalogModel(errors, identity, field, routing, requiredProfile)
   }
 }
 
+// Uma task fechada e um registro do passado, e nao um plano em aberto. O campo
+// lido aqui e orchestration.state porque ele e enum fechado que este arquivo ja
+// valida (ORCHESTRATION_STATES): o `status` do front matter e texto livre que o
+// validador nunca leu e que em projeto real ja aparece escrito de dois jeitos
+// ("done" e "completed"), entao aceitar ele seria adivinhar uma lista de grafias
+// que envelhece em silencio -- e cada grafia nova reabriria a checagem sem
+// ninguem notar. Schema 1 nao tem bloco orchestration e por isso nunca fecha:
+// e legado, e a flexibilizacao abaixo simplesmente nao o alcanca.
+function taskIsClosed(task) {
+  return isObject(task) && isObject(task.orchestration) && task.orchestration.state === 'done';
+}
+
 function effectiveReviewRequired(riskLevel, routing) {
   if (riskLevel === 'R3') return true;
   if (riskLevel === 'R2') return routing.project_policy.r2_review === 'required';
@@ -584,7 +596,7 @@ function catalogKeyHint(routing, value) {
 // Resolves one `{model, effort}` routing slot against the catalog. Returns the
 // effective profile rank so callers can compare slots (upgrade vs default) even
 // when the slot already failed the required-profile floor.
-function validateRoutingSlot(errors, slot, field, routing, requiredProfile, requiredCapabilities) {
+function validateRoutingSlot(errors, slot, field, routing, requiredProfile, requiredCapabilities, { warnings = [], closed = false } = {}) {
   if (!isObject(slot)) {
     addError(errors, field, 'must be a mapping with model and effort');
     return null;
@@ -604,7 +616,20 @@ function validateRoutingSlot(errors, slot, field, routing, requiredProfile, requ
     return null;
   }
   if (model.status !== 'active') {
-    addError(errors, `${field}.model`, `must reference an active routing.models entry (${modelKey})`);
+    // Eixo temporal. O catalogo segue vivo depois que a task fecha: um modelo
+    // que rodou enquanto era `active` e aposentado meses depois, e cobrar o
+    // status de HOJE de um plano encerrado ONTEM reprova um registro honesto por
+    // uma decisao tomada depois dele. O unico jeito de ficar verde seria trocar
+    // o nome do modelo no historico -- mentir sobre o que rodou e exatamente o
+    // que este validador existe para impedir, entao a regra estaria pagando para
+    // que a task minta. Com a task ainda aberta continua erro, porque ai ela diz
+    // a coisa certa: nao planeje em cima de modelo morto.
+    if (closed) {
+      addWarning(warnings, `${field}.model`,
+        `${modelKey} is ${model.status}, not active, in the catalog; it was retired after this task closed, so the recorded plan stands as written`);
+    } else {
+      addError(errors, `${field}.model`, `must reference an active routing.models entry (${modelKey})`);
+    }
   }
   if (typeof model.last_evaluated !== 'string' || model.last_evaluated.trim() === '') {
     addError(errors, `routing.models.${modelKey}.last_evaluated`, 'is required for a routed model');
@@ -676,7 +701,8 @@ function validateRoutedRole(errors, plan, roleName, routing, riskLevel, options)
       if (slotRequired) addError(errors, `${field}.${slot}`, 'must be a mapping with model and effort');
       continue;
     }
-    const rank = validateRoutingSlot(errors, value, `${field}.${slot}`, routing, requiredProfile, requiredCapabilities);
+    const rank = validateRoutingSlot(errors, value, `${field}.${slot}`, routing, requiredProfile, requiredCapabilities,
+      { warnings: options.warnings, closed: options.closed === true });
     if (rank !== null) ranks.set(slot, rank);
   }
 
@@ -996,23 +1022,27 @@ function validateTaskV2(task, routing, riskLevel, finalCommit, errors, warnings,
   const testRequired = effectiveTestGateRequired(riskLevel, routing);
   const crossProviderRequired = riskLevel === 'R3' && routing.project_policy.r3_cross_provider === true;
 
+  const closed = taskIsClosed(task);
   validateRoutedRole(errors, plan.executor, 'executor', routing, riskLevel, {
     routeProfileKey: 'executor_profile',
     requiredSlots: REQUIRED_EXECUTOR_SLOTS,
     taskRouting: task.routing,
     warnings,
+    closed,
   });
   validateRoutedRole(errors, plan.tester, 'tester', routing, riskLevel, {
     routeProfileKey: 'tester_profile',
     requiredSlots: ['default'],
     taskRouting: task.routing,
     warnings,
+    closed,
   });
   validateRoutedRole(errors, plan.reviewer, 'reviewer', routing, riskLevel, {
     routeProfileKey: 'reviewer_profile',
     requiredSlots: ['default'],
     taskRouting: task.routing,
     warnings,
+    closed,
   });
 
   // Um mesmo modelo em dois papeis diferentes permite que ele teste e revise o
