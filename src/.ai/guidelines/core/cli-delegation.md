@@ -66,8 +66,6 @@ cli_runners:
       supported: false                         # declare `true` só se a CLI aplica mesmo
       argv: ["--effort", "{effort}"]
       mapping: { low: ..., high: ..., max: ... }
-    env:                                       # ambiente desta execução (ver abaixo)
-      ANTHROPIC_BASE_URL: "http://localhost:PORTA/v1"
     observed_model:                            # como descobrir quem atendeu
       bin: "<comando>"
       argv: ["{run_dir}"]
@@ -128,30 +126,6 @@ Quando uma entrada do catálogo representa um **conjunto** de modelos, e não um
 modelo só, o perfil declarado é o do membro **mais fraco** — é a única coisa
 verdadeira sobre qualquer resposta que vier de lá. Pela mesma razão, as
 capacidades são a interseção, nunca a união.
-
-### Ambiente por execução (`env`)
-
-Algumas CLIs decidem para onde falar, ou com que credencial, por variável de
-ambiente — `ANTHROPIC_BASE_URL` e afins. Sem poder variar isso por execução, a
-única saída seria editar a configuração global da CLI, que vale para **tudo**,
-inclusive para as sessões que não tinham nada a ver com aquela execução.
-
-O `lnx-run.sh` recebe esses pares em `--env NOME=VALOR` e os exporta no
-supervisor, o que cobre de uma vez os quatro modos de lançamento.
-
-Duas regras:
-
-- essas variáveis quase sempre carregam credencial, então o arquivo `env` do
-  diretório do run fica com permissão `600` e o `meta.json` guarda **apenas os
-  nomes**. O registro diz o que foi injetado sem publicar o valor;
-- o mesmo binário apontado para endpoints diferentes são **runners diferentes**,
-  com nomes próprios. Não é preciosismo: o que muda junto é a capacidade. Um
-  endpoint pode não repassar o parâmetro de raciocínio, e aí aquela entrada
-  precisa declarar `effort.supported: false`, senão o kit credita esforço que
-  não foi aplicado — exatamente o que essa declaração existe para impedir.
-  Verifique antes de declarar `true`: mande o mesmo prompt com um orçamento de
-  raciocínio mínimo e outro alto, e compare. Se não mudar nada, não foi
-  aplicado.
 
 ### Abrir em modo interativo
 
