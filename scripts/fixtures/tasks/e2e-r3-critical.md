@@ -23,21 +23,21 @@ model_plan:
     required_capabilities: [backend, sql, tests]
     default: { model: openai-gpt-5-6-sol, effort: max }
     alt1: { model: anthropic-opus-5, effort: max }
-    alt2: { model: deepseek-v4-pro, effort: max }
+    alt2: { model: deepseek-v4-1-flash, effort: max }
     upgrade_alt1: { model: anthropic-opus-5, effort: max }
     upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
   tester:
     required: true
     required_profile: balanced
     default: { model: openai-gpt-5-6-terra, effort: high }
-    alt1: { model: deepseek-v4-pro, effort: high }
+    alt1: { model: deepseek-v4-1-flash, effort: high }
   reviewer:
     required: true
     required_profile: frontier
     independent_model: true
     cross_provider_required: true
     default: { model: anthropic-opus-5, effort: max }
-    alt1: { model: deepseek-v4-pro, effort: max }
+    alt1: { model: deepseek-v4-1-flash, effort: max }
 routing_rationale:
   executor: Dominio de pagamento com idempotencia exige capacidade frontier.
   tester: Um tester independente e mais barato verifica o comportamento observavel.

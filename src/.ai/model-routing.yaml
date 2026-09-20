@@ -16,6 +16,21 @@ project_policy:
   r3_cross_provider: true
   unknown_model_identity: reject_for_r3
 
+# Runners que consomem credito PAGO DIRETO da conta do humano, fora das
+# assinaturas de opencode e agy. Ficam desligados por padrao: um roteamento que
+# escolhe sozinho o caminho caro transforma decisao de orcamento em acidente.
+#
+# Ligar e decisao humana e consciente. Com `enabled: false`, o Planner nao deve
+# colocar nos slots nenhum modelo cujo unico runner esteja desligado, e o
+# Orchestrator nao deve ativa-lo nem como ultimo recurso — bloqueia e avisa.
+runner_policy:
+  claude:
+    enabled: false
+    conta: "API Anthropic do humano, cobrada por token"
+  codex:
+    enabled: false
+    conta: "API OpenAI do humano, cobrada por token"
+
 profiles:
   economical:
     rank: 1
@@ -85,6 +100,20 @@ models:
     last_evaluated: 2026-08-27
     evidence: "A OpenAI define `gpt-5.6-terra` como a opção que equilibra inteligência e custo; sua tabela de coding reporta 77,4 no Artificial Analysis Coding Agent Index, 63,4% no SWE-Bench Pro, 69,6% no DeepSWE v1.1 e 87,4% no Terminal-Bench 2.1, sustentando `balanced` por padrão e `frontier` apenas com High/Max. [S5][S7]"
 
+  deepseek-v4-1-flash:
+    provider: deepseek
+    model: "deepseek-flash"
+    profile: frontier
+    profile_by_variant:
+      default: frontier
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-09-18
+    evidence: "A DeepSeek lançou o DeepSeek-V4.1-Flash em 10/09/2026 sob o ID de API `deepseek-flash`, com 1M de contexto, 384K de saída, visão e concorrência de 2500; o model card reporta 90,6% no Terminal-Bench 2.1, 74,2% no DeepSWE, 65,4% no NL2Repo e 3471 de Codeforces, superando o V4 Pro em todas as métricas comparáveis por um preço 4,4x menor na entrada, o que sustenta `frontier`. Ressalva: marca apenas 20,3% no ProgramBench, contra 93,0% do Claude Opus 5, e nenhuma linha de coding tem medição independente, todas são do próprio provedor. [S9][S19]"
+
   deepseek-v4-pro:
     provider: deepseek
     model: "deepseek-v4-pro"
@@ -94,10 +123,10 @@ models:
       low: balanced
       high: frontier
       max: frontier
-    status: active
+    status: retired
     capabilities: [backend, frontend, tests, sql, review, long-context]
-    last_evaluated: 2026-08-27
-    evidence: "A DeepSeek levou `deepseek-v4-pro` a GA em 13/08/2026 e reportou 87,9 no Terminal-Bench 2.1, 61,5 no NL2Repo, 62,7 no DeepSWE v1.1 e 83,3 no CyberGym, além de posicioná-lo como seu modelo SOTA para agentic coding; por isso o padrão é `frontier`. [S9][S10]"
+    last_evaluated: 2026-09-20
+    evidence: "APOSENTADO em 2026-09-20 por decisao do humano. Nao e retirada do provedor: e redundancia. O `deepseek-v4-1-flash` o supera em todas as metricas comparaveis (Terminal-Bench 2.1 de 90,6 contra 87,9; DeepSWE de 74,2 contra 62,7) e custa menos, entao mante-lo como upgrade prometia uma escalada que na pratica nao escala. Pior: como revisor do v4.1 ele nao compra independencia, porque os dois compartilham linhagem e, com ela, os pontos cegos — que e justamente o que o gate de revisao existe para cobrir. Um slot que nao acrescenta capacidade nem independencia nao merece existir. Avaliacao anterior (2026-09-18): GA em 13/08/2026 e reportou 87,9 no Terminal-Bench 2.1, 61,5 no NL2Repo, 62,7 no DeepSWE v1.1 e 83,3 no CyberGym, além de posicioná-lo como seu modelo SOTA para agentic coding; por isso o padrão é `frontier`. Ressalva de ciclo de vida acrescentada em 2026-09-18: a DeepSeek anunciou o fim do serviço de API depois de 14/09/2026 e voltou atrás em resposta à demanda dos usuários, sem prazo garantido, então ancorar rota R3 nele é frágil. O `deepseek-v4-1-flash` o supera em todas as métricas comparáveis e custa menos. [S9][S10][S19]"
 
   deepseek-v4-flash:
     provider: deepseek
@@ -108,10 +137,10 @@ models:
       low: economical
       high: balanced
       max: balanced
-    status: preview
+    status: retired
     capabilities: [backend, frontend, tests, sql, review, long-context]
-    last_evaluated: 2026-08-27
-    evidence: "A DeepSeek mantém o ID `deepseek-v4-flash`; a versão 0731 entrou em API como versão formal em public beta e, em avaliações de Code Agent executadas em Max, marcou 82,7 no Terminal-Bench 2.1 e 54,2 no NL2Repo, portanto fica `balanced` e não é promovida a R3 enquanto não houver GA. [S9][S10]"
+    last_evaluated: 2026-09-18
+    evidence: "APOSENTADO em 2026-09-18. A nota oficial de Models & Pricing da DeepSeek declara que `deepseek-v4-flash` foi retirado: o nome ainda é aceito, mas as requisições são servidas pelo DeepSeek-V4.1-Flash e cobradas no preço Flash. Manter a entrada como active faria o roteamento prometer um `balanced` em preview e entregar um frontier, deriva de identidade que o `unknown_model_identity: reject_for_r3` existe para barrar. Use `deepseek-v4-1-flash`. Avaliação anterior (2026-08-27): 82,7 no Terminal-Bench 2.1 e 54,2 no NL2Repo em Max, classificado `balanced`. [S9][S10][S19]"
 
   deepseek-v4-flash-vision-exp:
     provider: deepseek
@@ -122,10 +151,24 @@ models:
       low: economical
       high: balanced
       max: balanced
-    status: preview
+    status: retired
     capabilities: [backend, frontend, tests, sql, review, vision, long-context]
-    last_evaluated: 2026-08-27
-    evidence: "A DeepSeek lançou `deepseek-v4-flash-vision-exp` em 21/08/2026 explicitamente como experimental, com capacidade textual equivalente à V4 Flash e ganhos multimodais; apesar de reportar 83,9 no Terminal-Bench 2.1 em sua avaliação Max, o status experimental mantém todas as variantes no máximo em `balanced`. [S9][S10]"
+    last_evaluated: 2026-09-18
+    evidence: "APOSENTADO em 2026-09-18 pela mesma nota oficial que retirou o `deepseek-v4-flash`: o ID continua aceito, mas quem responde é o DeepSeek-V4.1-Flash, cobrado no preço Flash. Use `deepseek-v4-1-flash`. Avaliação anterior (2026-08-27): lançado em 21/08/2026 como experimental, 83,9 no Terminal-Bench 2.1 em Max, classificado `balanced`. [S9][S10][S19]"
+
+  google-gemini-3-8-flash:
+    provider: google
+    model: "gemini-3.8-flash"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-09-18
+    evidence: "A documentação da Gemini API lista `gemini-3.8-flash` como Estável e a model card do DeepMind o marca em General availability, com 1M tokens de entrada, 64k de saída, multimodalidade completa e computer use; o lançamento de 02/09/2026 afirma que ele supera a maioria dos modelos frontier maiores no DeepSWE v1.1 e reporta 54,9% no HLE-Verified, mas os números de programação aparecem apenas em gráficos, sem valor textual verificável, e o próprio texto diz que ele se aproxima de modelos frontier mais caros sem igualá-los; por isso fica `balanced`, como o 3.7. [S18]"
 
   google-gemini-3-7-flash:
     provider: google
@@ -140,6 +183,78 @@ models:
     capabilities: [backend, frontend, tests, sql, review, vision, long-context]
     last_evaluated: 2026-08-27
     evidence: "A documentação Google de 13/08/2026 marca `gemini-3.7-flash` como Stable, nativamente multimodal, com 1.048.576 tokens de entrada, execução de código e thinking; como não encontrei ali um número público verificável de benchmark de programação específico do 3.7 Flash, a classificação fica conservadoramente em `balanced`. [S11]"
+
+  zhipu-glm-5-3-flash:
+    provider: zhipu
+    model: "glm-5.3-flash"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    last_evaluated: 2026-09-20
+    evidence: "MoE de 320B com 18B ativos por inferencia, da Z.ai, publicado em 14/08/2026 e voltado a coding, trabalho agentic de terminal e tarefas de horizonte longo. E o unico modelo deste catalogo com numero de coding CONFERIDO POR TERCEIRO: o leaderboard oficial do DeepSWE carrega uma entrada `glm-5.3-flash` em 63%, que bate com os 63,4 auto-reportados pela Z.ai. Todos os outros aqui dependem do numero do proprio provedor. Fica `balanced` porque 63 no DeepSWE esta claramente abaixo do `deepseek-v4-1-flash` (74,2), mas a verificacao independente pesa na escolha entre dois balanced. Runner: opencode (`opencode-go/glm-5.3-flash`). [S20][S21]"
+
+  alibaba-qwen-3-8-flash:
+    provider: alibaba
+    model: "qwen3.8-flash"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-09-20
+    evidence: "ATENCAO A IDENTIDADE. A pagina oficial do Qwen descreve `qwen3.8-flash` como o modelo multimodal mais recente da familia, a 0,15 dolar por milhao de tokens de entrada e 0,47 de saida. Os numeros de coding que circulam na imprensa (62,5 no SWE-bench Pro, MoE de 125B com 6B ativos) sao do **`Qwen3.8-Flash-Next`**, que e outro ID, com outra descricao. Creditar o numero de um ao outro seria exatamente a deriva que `unknown_model_identity` existe para barrar, entao esta entrada NAO tem numero publico verificavel proprio e fica `balanced` em todo esforco. Evidencia interna, que vale mais aqui do que benchmark de terceiro: em 2026-09-19 ele fez a re-revisao independente da task 4.4 neste repositorio, reexecutou a suite e o `php -l` por conta propria em vez de aceitar o relatado, citou arquivo e linha, listou o que conferiu e passou antes dos achados, e descartou corretamente um falso positivo de float em dinheiro que era codigo preexistente fora do caminho analisado. Devolveu `rejected` com tres achados que foram conferidos a mao e procedem. Runner: opencode (`opencode-go/qwen3.8-flash`). [S22]"
+
+  meta-muse-spark-1-3-contributor:
+    provider: meta
+    model: "muse-spark-1.3-contributor"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: balanced
+      high: frontier
+      max: frontier
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, long-context]
+    data_policy: contributor_training
+    last_evaluated: 2026-09-20
+    evidence: "Os numeros sao fortes: Terminal-Bench 2.1 em 88,8, DeepSWE em 75,4 e AA Coding Index em 75,8, acima do Gemini 3.8 Flash (73,7 no DeepSWE) e na faixa do Opus 5 (74). Por isso `frontier` em high e max. Duas ressalvas. Primeira: a Meta anunciou os resultados de topo numa configuracao `max reasoning` que ainda NAO esta amplamente disponivel; o que se entrega e o `xhigh`, que sustenta 89,2 no Terminal-Bench 2.1, entao para coding o numero se mantem. Segunda: o benchlm registra cobertura parcial (31 de 446 benchmarks) e o classifica como sem score geral publico. Runner: opencode (`opencode-go/muse-spark-1.3-contributor`). [S23][S24][S25]"
+    uso_restrito: "ENDPOINT CONTRIBUTOR: a Meta usa os prompts e as completions enviados para treinar produtos dela, e e essa troca que paga o desconto de cerca de 92% no token de entrada e 95% no de saida (0,10 e 0,20 dolar por milhao, contra 1,25 e 4,25 do padrao). Por isso este modelo so pode ser escolhido quando o conteudo que ele vai ler NAO for sensivel: landing page, texto de marketing, documentacao publica, codigo sem dado real. PROIBIDO em qualquer task que carregue dado financeiro, nome de pessoa fisica, credencial ou regra de negocio privada — e o revisor e o papel que mais le contexto, entao a proibicao pega com forca ali. Os arquivos de task deste projeto carregam renda, recebiveis e nomes de familiares: para eles, este modelo esta fora."
+
+  anthropic-sonnet-4-6:
+    provider: anthropic
+    model: "claude-sonnet-4-6"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-09-19
+    evidence: "Acrescentado em 2026-09-19 porque a CLI `agy` expoe `claude-sonnet-4-6` num pool de creditos distinto do pool usado pelo Gemini, e o humano quer distribuir custo entre os dois. E geracao anterior ao Claude 5, que e a familia atual da Anthropic. Nesta avaliacao NAO localizei numero publico verificavel de benchmark de programacao especifico deste ID, entao a classificacao e conservadora: `balanced` em todo esforco, sem `frontier` em nenhum. Consequencia deliberada: nao serve de executor nem de revisor em R3, onde a rota exige frontier. Reavaliar se aparecer medicao confiavel. [sem fonte verificada]"
+
+  anthropic-opus-4-6:
+    provider: anthropic
+    model: "claude-opus-4-6-thinking"
+    profile: balanced
+    profile_by_variant:
+      default: balanced
+      low: economical
+      high: balanced
+      max: balanced
+    status: active
+    capabilities: [backend, frontend, tests, sql, review, vision, long-context]
+    last_evaluated: 2026-09-19
+    evidence: "Acrescentado em 2026-09-19 pelo mesmo motivo do `anthropic-sonnet-4-6`: a CLI `agy` o expoe como `claude-opus-4-6-thinking`, em pool de credito separado. E geracao anterior ao Claude 5. Pela posicao de Opus na propria familia espera-se que supere o Sonnet 4.6 em trabalho agentic de codigo, mas NAO localizei nesta avaliacao numero publico verificavel especifico deste ID, e promover a `frontier` sem medicao seria creditar capacidade que nao foi comprovada — exatamente o que o campo `evidence` existe para impedir. Fica `balanced`, um degrau acima do Sonnet 4.6 apenas na ordem de preferencia dos slots, nao no perfil. [sem fonte verificada]"
 
   anthropic-haiku-4-5:
     provider: anthropic
@@ -308,142 +423,166 @@ execution_policy:
 #   upgrade_alt1 / upgrade_alt2 escalada VERTICAL, só depois de esgotar rework ou
 #                               quando a tarefa se revelou materialmente maior
 # Effort permitido: default | low | high | max
+# Recomendacoes de roteamento por tipo de trabalho. E a entrada declarativa do
+# Planner: ele escolhe aqui os slots concretos e os PERSISTE na task, que passa a
+# ser o contrato.
+#
+# Tres regras moldam as rotas abaixo, e todas vieram de defeito observado:
+#
+# 1. PAPEIS DISJUNTOS. Um modelo nao se repete entre executor, tester e
+#    reviewer, nem como alternativa. Se o mesmo modelo pode cair em dois papeis,
+#    mais cedo ou mais tarde ele testa e revisa o proprio trabalho, e o gate
+#    vira carimbo. Aconteceu.
+#
+# 2. NENHUM PAPEL DE GATE COM UMA FONTE SO. Quando a cota de um provedor esgota
+#    e nao sobra alternativa legitima, o agente nao para: ele fabrica uma. Ja
+#    houve caso de Orchestrator EDITAR o proprio contrato para legalizar a
+#    escolha. A saida nao e instruir mais, e nunca criar o beco.
+#
+# 3. O CARO FICA NO FIM. Modelos de cota curta entram como ultima alternativa
+#    lateral, nunca como default. Modelos que cobram direto da conta do humano
+#    ficam nos slots de upgrade e dependem de `runner_policy`.
+#
+# Slots:
+#   default                     preferencia normal
+#   alt1 / alt2                 alternativas LATERAIS, em ordem de preferencia;
+#                               a ultima e tipicamente a de cota mais curta
+#   upgrade_alt1 / upgrade_alt2 escalada VERTICAL, so depois de esgotar rework
 work_routes:
   backend-implementation:
     executor:
-      default: { model: deepseek-v4-pro, effort: high }
-      alt1: { model: openai-gpt-5-6-terra, effort: high }
-      alt2: { model: anthropic-sonnet-5, effort: high }
-      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
-      upgrade_alt2: { model: anthropic-opus-5, effort: max }
+      default: { model: deepseek-v4-1-flash, effort: high }
+      alt1: { model: meituan-longcat-2-0, effort: high }
+      alt2: { model: anthropic-sonnet-4-6, effort: default }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
     tester:
-      default: { model: openai-gpt-5-6-luna, effort: high }
-      alt1: { model: google-gemini-3-7-flash, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
     reviewer:
-      default: { model: anthropic-sonnet-5, effort: high }
-      alt1: { model: openai-gpt-5-6-terra, effort: high }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
+      alt2: { model: anthropic-opus-4-6, effort: default }
       upgrade_alt1: { model: anthropic-opus-5, effort: max }
 
   frontend-implementation:
     executor:
-      default: { model: anthropic-sonnet-5, effort: high }
-      alt1: { model: openai-gpt-5-6-terra, effort: high }
-      alt2: { model: google-gemini-3-7-flash, effort: high }
-      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
-      upgrade_alt2: { model: anthropic-opus-5, effort: max }
+      default: { model: google-gemini-3-8-flash, effort: high }
+      alt1: { model: deepseek-v4-1-flash, effort: high }
+      alt2: { model: anthropic-sonnet-4-6, effort: default }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
+      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
     tester:
-      default: { model: openai-gpt-5-6-luna, effort: high }
-      alt1: { model: anthropic-haiku-4-5, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
     reviewer:
-      default: { model: openai-gpt-5-6-terra, effort: high }
-      alt1: { model: anthropic-sonnet-5, effort: high }
-      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
+      alt2: { model: anthropic-opus-4-6, effort: default }
 
   test-authoring:
     executor:
-      default: { model: openai-gpt-5-6-luna, effort: high }
-      alt1: { model: xiaomi-mimo-v2-5, effort: high }
-      alt2: { model: google-gemini-3-7-flash, effort: high }
-      upgrade_alt1: { model: deepseek-v4-pro, effort: high }
-      upgrade_alt2: { model: anthropic-sonnet-5, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: high }
     reviewer:
-      default: { model: anthropic-sonnet-5, effort: high }
-      alt1: { model: openai-gpt-5-6-terra, effort: high }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
+      alt2: { model: anthropic-opus-4-6, effort: default }
 
   sql-migration:
     executor:
-      default: { model: deepseek-v4-pro, effort: high }
-      alt1: { model: anthropic-sonnet-5, effort: high }
-      alt2: { model: openai-gpt-5-6-terra, effort: high }
-      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      default: { model: deepseek-v4-1-flash, effort: high }
+      alt1: { model: meituan-longcat-2-0, effort: high }
+      alt2: { model: anthropic-sonnet-4-6, effort: default }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
       upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
     tester:
-      default: { model: openai-gpt-5-6-luna, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
     reviewer:
-      default: { model: anthropic-opus-5, effort: high }
-      alt1: { model: openai-gpt-5-6-sol, effort: high }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
+      alt2: { model: anthropic-opus-4-6, effort: default }
+      upgrade_alt1: { model: anthropic-opus-5, effort: max }
 
   bugfix:
     executor:
-      default: { model: openai-gpt-5-6-terra, effort: high }
-      alt1: { model: deepseek-v4-pro, effort: high }
-      alt2: { model: anthropic-sonnet-5, effort: high }
-      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
-      upgrade_alt2: { model: anthropic-opus-5, effort: max }
+      default: { model: deepseek-v4-1-flash, effort: high }
+      alt1: { model: google-gemini-3-8-flash, effort: high }
+      alt2: { model: anthropic-sonnet-4-6, effort: default }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
     tester:
-      default: { model: openai-gpt-5-6-luna, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
     reviewer:
-      default: { model: anthropic-sonnet-5, effort: high }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
+      alt2: { model: anthropic-opus-4-6, effort: default }
 
   refactor:
     executor:
-      default: { model: anthropic-sonnet-5, effort: high }
-      alt1: { model: deepseek-v4-pro, effort: high }
-      alt2: { model: openai-gpt-5-6-terra, effort: high }
-      upgrade_alt1: { model: anthropic-opus-5, effort: max }
-      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+      default: { model: deepseek-v4-1-flash, effort: high }
+      alt1: { model: meituan-longcat-2-0, effort: high }
+      alt2: { model: anthropic-sonnet-4-6, effort: default }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
     tester:
-      default: { model: openai-gpt-5-6-luna, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
     reviewer:
-      default: { model: openai-gpt-5-6-terra, effort: high }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
+      alt2: { model: anthropic-opus-4-6, effort: default }
 
   documentation:
     executor:
-      default: { model: anthropic-haiku-4-5, effort: default }
-      alt1: { model: openai-gpt-5-6-luna, effort: default }
-      alt2: { model: google-gemini-3-7-flash, effort: default }
-      upgrade_alt1: { model: openai-gpt-5-6-terra, effort: high }
-      upgrade_alt2: { model: anthropic-sonnet-5, effort: high }
+      default: { model: alibaba-qwen-3-7-plus, effort: default }
+      alt1: { model: tencent-hy3, effort: default }
+      alt2: { model: anthropic-haiku-4-5, effort: default }
+      upgrade_alt1: { model: deepseek-v4-1-flash, effort: high }
 
   # Trabalho R3: executor frontier, revisor frontier de outro provedor.
+  # ATENCAO: os modelos `balanced` do agy (sonnet-4-6, opus-4-6, haiku-4-5) NAO
+  # servem aqui — a rota R3 exige frontier, e eles entraram no catalogo como
+  # balanced por falta de medicao verificavel. Em R3, `runner_policy` quase
+  # sempre precisa estar ligado.
   critical-implementation:
     executor:
-      default: { model: openai-gpt-5-6-sol, effort: max }
-      alt1: { model: anthropic-opus-5, effort: max }
-      alt2: { model: deepseek-v4-pro, effort: max }
-      upgrade_alt1: { model: anthropic-opus-5, effort: max }
-      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
+      default: { model: deepseek-v4-1-flash, effort: max }
+      alt1: { model: anthropic-sonnet-5, effort: max }
+      alt2: { model: openai-gpt-5-6-sol, effort: max }
+      upgrade_alt1: { model: openai-gpt-5-6-sol, effort: max }
     tester:
-      default: { model: openai-gpt-5-6-terra, effort: high }
-      alt1: { model: deepseek-v4-pro, effort: high }
+      default: { model: xiaomi-mimo-v2-5, effort: high }
+      alt1: { model: alibaba-qwen-3-8-flash, effort: high }
+      alt2: { model: anthropic-haiku-4-5, effort: high }
     reviewer:
       default: { model: anthropic-opus-5, effort: max }
-      alt1: { model: deepseek-v4-pro, effort: max }
-      upgrade_alt1: { model: anthropic-opus-5, effort: max }
+      alt1: { model: openai-gpt-5-6-terra, effort: max }
 
-  # Trabalho de planejamento: analise de requisito, escrita/decomposicao de task,
-  # criterios de aceite, classificacao de risco e selecao de modelo.
   planning:
     executor:
-      default: { model: anthropic-sonnet-5, effort: high }
-      alt1: { model: openai-gpt-5-6-terra, effort: high }
-      alt2: { model: deepseek-v4-pro, effort: high }
+      default: { model: google-gemini-3-8-flash, effort: high }
+      alt1: { model: deepseek-v4-1-flash, effort: high }
+      alt2: { model: anthropic-sonnet-4-6, effort: default }
       upgrade_alt1: { model: anthropic-opus-5, effort: max }
-      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
 
   system-design:
     executor:
       default: { model: anthropic-opus-5, effort: max }
       alt1: { model: openai-gpt-5-6-sol, effort: max }
-      alt2: { model: anthropic-sonnet-5, effort: max }
+      alt2: { model: deepseek-v4-1-flash, effort: max }
       upgrade_alt1: { model: anthropic-opus-5, effort: max }
-      upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
     reviewer:
-      default: { model: openai-gpt-5-6-sol, effort: max }
-      alt1: { model: deepseek-v4-pro, effort: max }
+      default: { model: zhipu-glm-5-3-flash, effort: high }
+      alt1: { model: openai-gpt-5-6-luna, effort: high }
 
-# Runners de CLI para delegação de comandos via terminal.
-# `argv` é a forma preferida: cada elemento vira UM argumento, sem shell no meio,
-# portanto conteudo de task nunca pode virar comando. `command_template` continua
-# aceito para compatibilidade com o schema 1, mas é uma string de shell.
-#
-# Placeholders (substituídos elemento a elemento): {prompt} {model} {effort}
-# prompt_delivery: argv | file | stdin  (stdin/file são os mais seguros)
-# provides: quais modelos/provedores este runner sabe executar — é isto que
-#   desacopla modelo de CLI. Deixe vazio se o runner atende qualquer modelo.
-# effort.supported: declare `true` SOMENTE se a CLI realmente aplica o esforço.
-#   Declarar `true` sem suporte real quebra a garantia de identidade do R3.
-# Use /lnx-configurar-roteamento para reconfigurar interativamente.
 cli_runners:
   # Interfaces verificadas contra os binarios instalados em 2026-08-31 com
   # `--help`. Ao trocar de CLI ou de versao, confirme antes de editar: um

@@ -87,8 +87,8 @@ test('E2E 6 — a review of an earlier commit is stale and cannot close the task
 test('E2E 7 — an R3 review from the executor provider is rejected', () => {
   const result = run({
     task: fixture('e2e-r3-critical.md')
-      .replace('    default: { model: anthropic-opus-5, effort: max }\n    alt1: { model: deepseek-v4-pro, effort: max }',
-        '    default: { model: openai-gpt-5-6-sol, effort: max }\n    alt1: { model: deepseek-v4-pro, effort: max }'),
+      .replace('    default: { model: anthropic-opus-5, effort: max }\n    alt1: { model: deepseek-v4-1-flash, effort: max }',
+        '    default: { model: openai-gpt-5-6-sol, effort: max }\n    alt1: { model: deepseek-v4-1-flash, effort: max }'),
   });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /must differ from the planned executor model/);
@@ -98,8 +98,8 @@ test('E2E 8 — a cheaper tester whose eligibility depends on effort needs an ef
   // openai-gpt-5-6-luna is economical by default and only reaches balanced at
   // high, so an effort-blind runner cannot satisfy the balanced tester floor.
   const task = fixture('e2e-r3-critical.md')
-    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: deepseek-v4-pro, effort: high }',
-      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: deepseek-v4-pro, effort: high }')
+    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }',
+      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }')
     .replace('      model: openai-gpt-5-6-terra\n      effort: high', '      model: openai-gpt-5-6-luna\n      effort: high');
   const result = run({ task });
   assert.notEqual(result.status, 0);
@@ -108,8 +108,8 @@ test('E2E 8 — a cheaper tester whose eligibility depends on effort needs an ef
 
 test('E2E 9 — the same tester is accepted once the runner declares real effort support', () => {
   const task = fixture('e2e-r3-critical.md')
-    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: deepseek-v4-pro, effort: high }',
-      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: deepseek-v4-pro, effort: high }')
+    .replace('    default: { model: openai-gpt-5-6-terra, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }',
+      '    default: { model: openai-gpt-5-6-luna, effort: high }\n    alt1: { model: deepseek-v4-1-flash, effort: high }')
     .replace('      model: openai-gpt-5-6-terra\n      effort: high', '      model: openai-gpt-5-6-luna\n      effort: high');
   // Declaring real support means both the flag and the level mapping.
   const routing = readFileSync(shippedRouting, 'utf8').replace(
@@ -167,10 +167,10 @@ test('E2E 11 — a task that finished on an upgrade slot records that slot', () 
     .replace('  attempts: { executor: 2, reworks: 1, upgrades: 0 }', '  attempts: { executor: 3, reworks: 1, upgrades: 1 }')
     .replace('    attempts: 2', '    attempts: 3')
     // The reviewer must stay independent of the model that actually executed.
-    .replace('    default: { model: anthropic-opus-5, effort: max }\n    alt1: { model: deepseek-v4-pro, effort: max }',
-      '    default: { model: deepseek-v4-pro, effort: max }\n    alt1: { model: anthropic-opus-5, effort: max }')
+    .replace('    default: { model: anthropic-opus-5, effort: max }\n    alt1: { model: deepseek-v4-1-flash, effort: max }',
+      '    default: { model: deepseek-v4-1-flash, effort: max }\n    alt1: { model: anthropic-opus-5, effort: max }')
     .replace('      agent: claude-code\n      provider: anthropic\n      model: anthropic-opus-5\n      effort: max\n      runner: claude',
-      '      agent: opencode\n      provider: deepseek\n      model: deepseek-v4-pro\n      effort: max\n      runner: opencode');
+      '      agent: opencode\n      provider: deepseek\n      model: deepseek-v4-1-flash\n      effort: max\n      runner: opencode');
   const result = run({ task });
   assert.equal(result.status, 0, result.stderr);
 });
