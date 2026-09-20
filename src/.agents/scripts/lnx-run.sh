@@ -656,11 +656,11 @@ command_start() {
             --runner-arg) runner_args+=("${2:-}"); shift 2 ;;
             --observe-bin) observe_bin="${2:-}"; shift 2 ;;
             --observe-arg) observe_args+=("${2:-}"); shift 2 ;;
-            # Um mesmo binario pode falar com provedores diferentes conforme o
-            # endpoint, e e isso que um proxy local faz. Sem poder variar o
-            # ambiente por execucao, a unica saida seria editar a configuracao
-            # global da CLI -- que vale para tudo, inclusive para as sessoes que
-            # nao deviam passar pelo proxy.
+            # Algumas CLIs decidem para onde falar, ou com que credencial, por
+            # variavel de ambiente -- ANTHROPIC_BASE_URL e afins. Sem poder
+            # variar isso por execucao, a unica saida seria editar a
+            # configuracao global da CLI, que vale para TUDO, inclusive para as
+            # sessoes que nao tinham nada a ver com aquela execucao.
             --env)
                 # O nome inteiro precisa ser conferido, caractere a caractere.
                 # Um glob como [A-Za-z_]*=* aceitaria "NOT VALID=1", porque `*`

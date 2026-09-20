@@ -443,6 +443,13 @@ execution_policy:
 #    lateral, nunca como default. Modelos que cobram direto da conta do humano
 #    ficam nos slots de upgrade e dependem de `runner_policy`.
 #
+# 4. ENTRADA QUE E CONJUNTO NAO REPETE MEMBRO. Quando uma entrada do catalogo
+#    resolve para um POOL de modelos, e nao para um so, dois pools de papeis
+#    diferentes nao podem compartilhar membro. De fora sao dois nomes distintos
+#    e a regra 1 aprova; no dia em que a cota apertar, os dois caem no mesmo
+#    modelo e o executor revisa a si mesmo. O validador nao ve isso -- ele
+#    confere nomes, nao composicao. Quem garante e quem escreve este arquivo.
+#
 # Slots:
 #   default                     preferencia normal
 #   alt1 / alt2                 alternativas LATERAIS, em ordem de preferencia;

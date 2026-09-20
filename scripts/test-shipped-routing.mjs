@@ -242,9 +242,17 @@ test('the implementation never hardcodes a model, provider or CLI name', () => {
     'scripts/cli.mjs',
     'src/.agents/scripts/lnx-run.sh',
   ];
+  // Comentario nao acopla nada: ninguem troca de provedor por causa de uma
+  // palavra dentro de `#`. O risco e codigo que DECIDE por nome de modelo, e a
+  // trava fica inteira ai. Antes disso a regra tambem pegava comentario, e o
+  // custo aparecia no lugar errado: explicar por que uma variavel de ambiente
+  // existe sem poder escrever o nome dela deixa o comentario pior justamente
+  // onde ele deveria explicar o porque.
+  const comentario = /^\s*(#|\/\/|\*|\/\*)/;
   const leaks = [];
   for (const relative of implementation) {
     readFileSync(path.join(rootDirectory, relative), 'utf8').split('\n').forEach((line, index) => {
+      if (comentario.test(line)) return;
       if (forbidden.test(line)) leaks.push(`${relative}:${index + 1}: ${line.trim()}`);
     });
   }

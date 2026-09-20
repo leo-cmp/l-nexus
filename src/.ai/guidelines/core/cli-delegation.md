@@ -79,9 +79,9 @@ Placeholders: `{prompt}`, `{model}`, `{effort}` no runner; `{run_dir}` e
 ### Quem atendeu (`observed_model`)
 
 Quem **atendeu** não é necessariamente quem foi **pedido**. Uma CLI com fallback
-troca de modelo sozinha quando o primário está sobrecarregado; um proxy troca
-quando a cota acaba. Nos dois casos o registro da task diria o modelo pedido, e
-estaria errado sem ninguém perceber.
+troca de modelo sozinha quando o primário está sobrecarregado; um endpoint que
+faz rodízio troca quando a cota acaba. Nos dois casos o registro da task diria o
+modelo pedido, e estaria errado sem ninguém perceber.
 
 Nem toda CLI sabe contar qual foi. Medido em 2026-09-20, com prompt mínimo e
 saída JSON:
@@ -124,28 +124,34 @@ Três regras:
   aparece na tela. Num terminal visível que o humano acompanha, isso é um
   custo real: pondere entre ver o agente trabalhando e poder provar quem era.
 
+Quando uma entrada do catálogo representa um **conjunto** de modelos, e não um
+modelo só, o perfil declarado é o do membro **mais fraco** — é a única coisa
+verdadeira sobre qualquer resposta que vier de lá. Pela mesma razão, as
+capacidades são a interseção, nunca a união.
+
 ### Ambiente por execução (`env`)
 
-Um mesmo binário fala com provedores diferentes conforme o endpoint, e é assim
-que um proxy local se liga. Sem poder variar o ambiente por execução, a única
-saída seria editar a configuração global da CLI — que vale para **tudo**,
-inclusive para as sessões que não deviam passar pelo proxy.
+Algumas CLIs decidem para onde falar, ou com que credencial, por variável de
+ambiente — `ANTHROPIC_BASE_URL` e afins. Sem poder variar isso por execução, a
+única saída seria editar a configuração global da CLI, que vale para **tudo**,
+inclusive para as sessões que não tinham nada a ver com aquela execução.
 
 O `lnx-run.sh` recebe esses pares em `--env NOME=VALOR` e os exporta no
 supervisor, o que cobre de uma vez os quatro modos de lançamento.
 
-Duas regras, porque essas variáveis quase sempre carregam credencial:
+Duas regras:
 
-- o arquivo `env` do diretório do run fica com permissão `600`, e o `meta.json`
-  guarda **apenas os nomes** das variáveis. O registro diz o que foi injetado
-  sem publicar o valor;
-- um runner atrás de proxy é um **runner separado**, com nome próprio. Não
-  reaproveite a entrada da CLI direta. As duas têm capacidades diferentes: se o
-  proxy não repassa o parâmetro de raciocínio, aquela entrada precisa declarar
-  `effort.supported: false`, senão o kit credita esforço que não foi aplicado —
-  exatamente o que essa declaração existe para impedir. Verifique antes de
-  declarar `true`: mande o mesmo prompt com um orçamento de raciocínio mínimo e
-  outro alto, e compare. Se não mudar nada, não foi aplicado.
+- essas variáveis quase sempre carregam credencial, então o arquivo `env` do
+  diretório do run fica com permissão `600` e o `meta.json` guarda **apenas os
+  nomes**. O registro diz o que foi injetado sem publicar o valor;
+- o mesmo binário apontado para endpoints diferentes são **runners diferentes**,
+  com nomes próprios. Não é preciosismo: o que muda junto é a capacidade. Um
+  endpoint pode não repassar o parâmetro de raciocínio, e aí aquela entrada
+  precisa declarar `effort.supported: false`, senão o kit credita esforço que
+  não foi aplicado — exatamente o que essa declaração existe para impedir.
+  Verifique antes de declarar `true`: mande o mesmo prompt com um orçamento de
+  raciocínio mínimo e outro alto, e compare. Se não mudar nada, não foi
+  aplicado.
 
 ### Abrir em modo interativo
 
