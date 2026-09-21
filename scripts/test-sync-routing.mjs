@@ -186,15 +186,19 @@ function withoutSection(source, key) {
 // para dois runners cada. Semear nao briga com preservar: preservar so tem
 // sentido quando ha o que preservar.
 test('a PRESERVED section the project never had is seeded from the kit', () => {
-  withProjectRouting((source) => withoutSection(source, 'runner_policy'), ({ run, parsed }) => {
-    assert.equal(parse(readFileSync(shipped, 'utf8')).runner_policy !== undefined, true);
-    const result = run('--write');
-    assert.equal(result.status, 0, result.stderr);
-    const runnerPolicy = parsed().runner_policy;
-    assert.ok(runnerPolicy, 'runner_policy was not seeded');
-    assert.equal(runnerPolicy.claude.enabled, false);
-    assert.match(result.stdout, /Semeado: runner_policy/);
-  });
+  const kit = parse(readFileSync(shipped, 'utf8'));
+  for (const section of PRESERVED) {
+    assert.ok(kit[section] !== undefined, `the kit itself has no ${section} to seed`);
+    withProjectRouting((source) => withoutSection(source, section), ({ run, parsed }) => {
+      const result = run('--write');
+      assert.equal(result.status, 0, result.stderr);
+      assert.deepEqual(parsed()[section], kit[section], `${section} was not seeded from the kit`);
+      assert.match(result.stdout, new RegExp(`Semeado: ${section}`));
+      // Semear uma vez e semear sempre sao coisas diferentes: a segunda rodada
+      // tem que achar a secao no lugar e nao ter mais nada a fazer.
+      assert.match(run().stdout, /ja esta sincronizado com o kit/);
+    });
+  }
 });
 
 // O outro lado da mesma regra, e o que impede a correcao de virar atropelo: se
