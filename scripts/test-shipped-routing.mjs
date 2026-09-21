@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
-import { parse } from 'yaml';
+import { parse, parseDocument } from 'yaml';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.dirname(scriptsDirectory);
@@ -117,7 +117,7 @@ test('E2E 9 — the same tester is accepted once the runner declares real effort
   // Declaring real support means both the flag and the level mapping.
   const routing = readFileSync(shippedRouting, 'utf8').replace(
     '      # Nao verificado nesta versao da CLI. Deixe false ate confirmar.\n      supported: false\n      argv: []\n      mapping: {}',
-    '      supported: true\n      argv: ["--effort", "{effort}"]\n      mapping: { low: low, high: high, max: max }',
+    '      supported: true\n      argv: [ "--effort", "{effort}" ]\n      mapping: { low: low, high: high, max: max }',
   );
   const result = run({ task, routing });
   assert.equal(result.status, 0, result.stderr);
@@ -297,7 +297,7 @@ test('every runner declares interactive and autonomy support explicitly', () => 
       const supported = declared.match(/^      supported: (true|false)$/m);
       if (!supported) problems.push(`${name}.${section} does not state supported`);
       // Claiming support with no argv would be a promise the runner cannot keep.
-      else if (supported[1] === 'true' && !/^      argv: \[".+/m.test(declared)) {
+      else if (supported[1] === 'true' && !/^      argv: \[ ?".+/m.test(declared)) {
         problems.push(`${name}.${section} claims support but declares no argv`);
       }
     }
@@ -360,4 +360,28 @@ test('the update skill quotes the error the validator really emits', () => {
 
   // And it must point at the command that actually fixes it.
   assert.match(skill, /migrate-routing[^\n]*--write/);
+});
+
+// O catalogo publicado tem que sobreviver a um round-trip da lib de YAML sem
+// mudar um byte. Nao e preciosismo de estilo: `sync-routing` reescreve o arquivo
+// com `toString()`, entao um arquivo instavel faz TODO projeto receber, junto da
+// mudanca real, dezenas de linhas reformatadas -- e a partir dai `diff` entre o
+// kit e o projeto para de servir para enxergar divergencia de verdade.
+//
+// Custou duas vezes no mesmo dia: primeiro 27 linhas normalizadas a mao depois
+// de editar pelo Document API, e depois as mesmas 27 reaparecendo no sync. O
+// arquivo misturava `["x"]` e `[ x ]`; agora usa o que a lib emite, e esta
+// guarda quebra na proxima vez que alguem escrever a mao o estilo que nao
+// sobrevive.
+test('the shipped catalog survives a YAML round-trip byte for byte', () => {
+  const source = readFileSync(shippedRouting, 'utf8');
+  const roundTripped = parseDocument(source).toString({ lineWidth: 0 });
+  const changed = source.split('\n')
+    .map((line, index) => [index + 1, line, roundTripped.split('\n')[index]])
+    .filter(([, before, after]) => before !== after);
+  assert.deepEqual(
+    changed.map(([line, before, after]) => `line ${line}: ${before} -> ${after}`),
+    [],
+    'sync-routing rewrites the file with toString(); an unstable file means every project gets reformatting noise',
+  );
 });

@@ -926,15 +926,15 @@ cli_runners:
   codex:
     binary: "codex"
     # `codex exec ... -` le as instrucoes do stdin.
-    argv: ["exec", "--model", "{model}", "-"]
+    argv: [ "exec", "--model", "{model}", "-" ]
     prompt_delivery: stdin
     interactive:
       # Sem subcomando as opcoes vao para a CLI interativa; PROMPT e posicional.
       supported: true
-      argv: ["--model", "{model}", "{prompt}"]
+      argv: [ "--model", "{model}", "{prompt}" ]
     autonomy:
       supported: true
-      argv: ["--dangerously-bypass-approvals-and-sandbox"]
+      argv: [ "--dangerously-bypass-approvals-and-sandbox" ]
     default_model: "gpt-5.6-sol"
     provides:
       providers: [ openai ]
@@ -946,15 +946,15 @@ cli_runners:
       mapping: {}
   claude:
     binary: "claude"
-    argv: ["-p", "{prompt}", "--model", "{model}"]
+    argv: [ "-p", "{prompt}", "--model", "{model}" ]
     prompt_delivery: argv
     interactive:
       # Interativo por padrao; PROMPT e posicional.
       supported: true
-      argv: ["--model", "{model}", "{prompt}"]
+      argv: [ "--model", "{model}", "{prompt}" ]
     autonomy:
       supported: true
-      argv: ["--dangerously-skip-permissions"]
+      argv: [ "--dangerously-skip-permissions" ]
     default_model: "claude-sonnet-5"
     provides:
       providers: [ anthropic ]
@@ -962,12 +962,12 @@ cli_runners:
     effort:
       # `--effort low|medium|high|xhigh|max`
       supported: true
-      argv: ["--effort", "{effort}"]
+      argv: [ "--effort", "{effort}" ]
       mapping: { low: low, high: high, max: max }
   opencode:
     binary: "opencode"
     # O subcomando `run` e o modo nao interativo; sem ele a TUI abre e trava.
-    argv: ["run", "--model", "{model}", "{prompt}"]
+    argv: [ "run", "--model", "{model}", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       # A TUI abre sem aceitar prompt inicial, entao nao da para conduzir por
@@ -976,7 +976,7 @@ cli_runners:
       argv: []
     autonomy:
       supported: true
-      argv: ["--auto"]
+      argv: [ "--auto" ]
     default_model: "deepseek-v4-flash"
     provides:
       # meituan e xiaomi nao tem CLI propria nem entrada por familia: opencode e
@@ -995,7 +995,7 @@ cli_runners:
       # maioria -- mandar `max` a um Qwen devolve 400. Quem precisa de esforco
       # usa uma das entradas por familia abaixo, onde o mapping pode ser honesto.
       supported: false
-      argv: ["--variant", "{effort}"]
+      argv: [ "--variant", "{effort}" ]
       mapping: {}
 
   # As tres entradas a seguir sao o MESMO binario. O que muda e a capacidade, e
@@ -1004,33 +1004,33 @@ cli_runners:
   # para traduzir do vocabulario do kit para o do provedor.
   opencode-deepseek:
     binary: "opencode"
-    argv: ["run", "--model", "{model}", "{prompt}"]
+    argv: [ "run", "--model", "{model}", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       supported: false
       argv: []
     autonomy:
       supported: true
-      argv: ["--auto"]
+      argv: [ "--auto" ]
     provides:
       providers: [ deepseek ]
       models: []
     effort:
       # DeepSeek nao tem `low`: pedir devolve 400, entao fica fora do mapping.
       supported: true
-      argv: ["--variant", "{effort}"]
+      argv: [ "--variant", "{effort}" ]
       mapping: { high: high, max: max }
 
   opencode-qwen:
     binary: "opencode"
-    argv: ["run", "--model", "{model}", "{prompt}"]
+    argv: [ "run", "--model", "{model}", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       supported: false
       argv: []
     autonomy:
       supported: true
-      argv: ["--auto"]
+      argv: [ "--auto" ]
     provides:
       providers: [ alibaba, tencent ]
       models: []
@@ -1038,19 +1038,19 @@ cli_runners:
       # Qwen e Hy3 vao ate `high`. `max` nao existe neles, entao nao se declara:
       # declarar abriria a porta para creditar um esforco que devolveria 400.
       supported: true
-      argv: ["--variant", "{effort}"]
+      argv: [ "--variant", "{effort}" ]
       mapping: { low: low, high: high }
 
   opencode-muse:
     binary: "opencode"
-    argv: ["run", "--model", "{model}", "{prompt}"]
+    argv: [ "run", "--model", "{model}", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       supported: false
       argv: []
     autonomy:
       supported: true
-      argv: ["--auto"]
+      argv: [ "--auto" ]
     provides:
       providers: [ meta, xai, openai ]
       models: []
@@ -1060,20 +1060,20 @@ cli_runners:
       # `xhigh` -- traduzir aqui e exatamente para o que o mapping existe, e
       # evita inventar um nivel novo no vocabulario do kit.
       supported: true
-      argv: ["--variant", "{effort}"]
+      argv: [ "--variant", "{effort}" ]
       mapping: { low: low, high: high, max: xhigh }
   agy:
     binary: "agy"
     # `--print` e obrigatorio: sem ele a sessao abre interativa e nao retorna.
-    argv: ["--model", "{model}", "--print", "{prompt}"]
+    argv: [ "--model", "{model}", "--print", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       # `-i` executa o prompt inicial e mantem a sessao aberta.
       supported: true
-      argv: ["--model", "{model}", "-i", "{prompt}"]
+      argv: [ "--model", "{model}", "-i", "{prompt}" ]
     autonomy:
       supported: true
-      argv: ["--dangerously-skip-permissions"]
+      argv: [ "--dangerously-skip-permissions" ]
     # Os ids desta CLI embutem o esforco no proprio nome do modelo
     # (ex.: `<familia>-high` / `-medium` / `-low`). Consulte `agy models`.
     default_model: "gemini-3.7-flash-high"
@@ -1084,16 +1084,16 @@ cli_runners:
       # `--effort low|medium|high`. Nao existe `max`, entao `max` fica fora do
       # mapping de proposito: creditar um esforco inexistente seria mentira.
       supported: true
-      argv: ["--effort", "{effort}"]
+      argv: [ "--effort", "{effort}" ]
       mapping: { low: low, high: high }
   qwen:
     binary: "qwen"
-    argv: ["--model", "{model}", "--prompt", "{prompt}"]
+    argv: [ "--model", "{model}", "--prompt", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       # `-i, --prompt-interactive`
       supported: true
-      argv: ["--model", "{model}", "-i", "{prompt}"]
+      argv: [ "--model", "{model}", "-i", "{prompt}" ]
     autonomy:
       # Esta versao nao expoe nenhuma flag de aprovacao automatica. Declarar
       # uma inexistente faria a delegacao falhar na abertura.
@@ -1109,7 +1109,7 @@ cli_runners:
       mapping: {}
   kimi:
     binary: "kimi"
-    argv: ["--model", "{model}", "--prompt", "{prompt}"]
+    argv: [ "--model", "{model}", "--prompt", "{prompt}" ]
     prompt_delivery: argv
     interactive:
       # Nao aceita prompt posicional; so `-c/--continue` retoma sessao.
@@ -1117,7 +1117,7 @@ cli_runners:
       argv: []
     autonomy:
       supported: true
-      argv: ["--yolo"]
+      argv: [ "--yolo" ]
     default_model: "kimi-k2-chat"
     provides:
       providers: []
