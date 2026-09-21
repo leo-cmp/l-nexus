@@ -29,10 +29,10 @@ const SHIPPED_ROUTING = path.join(scriptDirectory, '..', 'src', '.ai', 'model-ro
 
 // O que vem do kit e do mundo. Trocado inteiro, com os comentarios do kit junto:
 // a justificativa de uma rota vale tanto quanto a rota.
-const SYNCED = ['schema_version', 'profiles', 'models', 'routes', 'execution_policy', 'work_routes'];
+export const SYNCED = ['schema_version', 'profiles', 'models', 'routes', 'execution_policy', 'work_routes'];
 
 // O que e do projeto e da maquina. Nunca tocado.
-const PRESERVED = ['project_policy', 'runner_policy', 'terminal_runners'];
+export const PRESERVED = ['project_policy', 'runner_policy', 'terminal_runners'];
 
 // cli_runners nao cabe em nenhuma das duas categorias, e tratar como uma delas
 // quebra de um jeito ou de outro. QUAIS binarios existem e da maquina; o argv, o
@@ -43,7 +43,7 @@ const PRESERVED = ['project_policy', 'runner_policy', 'terminal_runners'];
 //
 // Entao: entrada que o kit conhece e atualizada, entrada que so o projeto tem
 // fica intacta. Nada se perde e a correcao chega.
-const MERGED = ['cli_runners'];
+export const MERGED = ['cli_runners'];
 
 // risk_domains tem os dois donos na mesma secao: a lista generica e do kit, a
 // do projeto e do projeto. E a unica que precisa ser costurada chave a chave.
@@ -151,6 +151,24 @@ function replacePair(destino, origem, chave) {
   else itens[indice] = par;
 }
 
+// Semear uma secao que falta nao pode jogar ela no fim do arquivo: o
+// `model-routing.yaml` e lido por humano, e a ordem das secoes e parte do que o
+// torna legivel. Entra na mesma vizinhanca que ocupa no kit -- logo depois da
+// ultima secao anterior a ela que o projeto tambem tem.
+function insertPairWhereTheKitKeepsIt(destino, origem, chave) {
+  const par = origem.contents?.items?.find((item) => String(item.key) === chave);
+  const itens = destino.contents?.items;
+  if (!par || !itens) return false;
+  const ordemDoKit = (origem.contents?.items ?? []).map((item) => String(item.key));
+  const anteriores = ordemDoKit.slice(0, ordemDoKit.indexOf(chave)).reverse();
+  for (const anterior of anteriores) {
+    const indice = itens.findIndex((item) => String(item.key) === anterior);
+    if (indice !== -1) { itens.splice(indice + 1, 0, par); return true; }
+  }
+  itens.unshift(par);
+  return true;
+}
+
 export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
   const kit = readDocument(from, 'kit routing');
   const projeto = readDocument(routingPath, 'project routing');
@@ -178,6 +196,20 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
     for (const item of doKit.items ?? []) {
       projeto.setIn([chave, String(item.key)], item.value);
     }
+  }
+
+  // PRESERVED protege o que o projeto decidiu; nao pode significar tambem "nao
+  // cria o que falta". Projeto instalado antes de o campo existir ficava sem ele
+  // PARA SEMPRE, e calado: o resumo so lista como preservado aquilo que ja
+  // estava la, entao a ausencia era invisivel dos dois lados. O caso caro e
+  // `runner_policy` -- sem ela os runners pagos ficam LIGADOS por omissao, o
+  // oposto exato do padrao que o kit escolheu. Semear nao briga com preservar:
+  // preservar so tem sentido quando ha o que preservar.
+  const semeadas = [];
+  for (const chave of PRESERVED) {
+    if (projeto.has(chave)) continue;
+    if (kit.get(chave, true) === undefined) continue;
+    if (insertPairWhereTheKitKeepsIt(projeto, kit, chave)) semeadas.push(chave);
   }
 
   // risk_domains: so as listas do kit, preservando o que o projeto acrescentou.
@@ -208,6 +240,8 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
     describeMapping(`${chave} (mesclado)`, antes[chave], depois[chave], linhas);
   }
 
+  for (const chave of semeadas) linhas.push(`${chave}: semeado (o projeto nao tinha a secao)`);
+
   const preservadas = PRESERVED.filter((chave) => antes[chave] !== undefined);
   // Uma secao que o projeto tem e o kit desconhece nao e erro: pode ser
   // configuracao local legitima. Ela fica onde esta, e e dita em voz alta para
@@ -221,6 +255,7 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
     text: projeto.toString({ lineWidth: 0 }),
     changed: linhas.length > 0,
     summary: linhas,
+    seeded: semeadas,
     preserved: preservadas,
     unknown: desconhecidas,
   };
@@ -240,6 +275,9 @@ function main() {
     } else {
       console.log(options.write ? 'Sincronizado:' : 'Mudaria (dry-run):');
       for (const linha of resultado.summary) console.log(`  ${linha}`);
+    }
+    if (resultado.seeded.length > 0) {
+      console.log(`Semeado: ${resultado.seeded.join(', ')}`);
     }
     if (resultado.preserved.length > 0) {
       console.log(`Preservado: ${resultado.preserved.join(', ')}, risk_domains.project`);

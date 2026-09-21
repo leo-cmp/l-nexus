@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
+import { MERGED, PRESERVED, SYNCED } from './sync-routing.mjs';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const command = path.join(scriptsDirectory, 'sync-routing.mjs');
@@ -165,4 +166,62 @@ test('cli_runners merges: the kit updates what it knows and keeps what it does n
     assert.equal(runners.opencode.binary, 'opencode', 'a entrada desatualizada do projeto nao foi corrigida');
     assert.equal(runners['runner-caseiro'].binary, 'meu-script', 'o runner local foi apagado');
   });
+});
+
+// Remove uma secao inteira de topo, simulando projeto instalado ANTES de o kit
+// passar a ter esse campo. Nao e hipotese: o clp foi instalado antes de
+// `runner_policy` existir e chegou na 0.12.4 sem nenhuma politica de runner.
+function withoutSection(source, key) {
+  return source.replace(
+    new RegExp(`\\n${key}:\\n(?:  .*\\n|    .*\\n|\\n(?=  ))*`),
+    '\n',
+  );
+}
+
+// PRESERVED protegia o que existe e nao criava o que falta, entao um projeto
+// antigo ficava permanentemente sem a secao -- e em silencio, porque o resumo so
+// lista como preservado aquilo que ja estava la. O caso caro e este: sem
+// `runner_policy` os runners pagos ficam LIGADOS por omissao, que e o oposto
+// exato do padrao que o kit escolheu, e 28 slots das rotas passam a resolver
+// para dois runners cada. Semear nao briga com preservar: preservar so tem
+// sentido quando ha o que preservar.
+test('a PRESERVED section the project never had is seeded from the kit', () => {
+  withProjectRouting((source) => withoutSection(source, 'runner_policy'), ({ run, parsed }) => {
+    assert.equal(parse(readFileSync(shipped, 'utf8')).runner_policy !== undefined, true);
+    const result = run('--write');
+    assert.equal(result.status, 0, result.stderr);
+    const runnerPolicy = parsed().runner_policy;
+    assert.ok(runnerPolicy, 'runner_policy was not seeded');
+    assert.equal(runnerPolicy.claude.enabled, false);
+    assert.match(result.stdout, /Semeado: runner_policy/);
+  });
+});
+
+// O outro lado da mesma regra, e o que impede a correcao de virar atropelo: se
+// a secao existe, ela e do projeto e nao se toca, nem quando discorda do kit.
+test('a PRESERVED section the project already has is never overwritten', () => {
+  withProjectRouting(
+    (source) => source.replace(
+      '  claude:\n    enabled: false\n    conta: "API Anthropic do humano, cobrada por token"',
+      '  claude:\n    enabled: true\n    conta: "decisao do projeto"',
+    ),
+    ({ run, parsed }) => {
+      const result = run('--write');
+      assert.equal(result.status, 0, result.stderr);
+      assert.equal(parsed().runner_policy.claude.enabled, true);
+      assert.equal(parsed().runner_policy.claude.conta, 'decisao do projeto');
+      assert.doesNotMatch(result.stdout, /Semeado: .*runner_policy/);
+    },
+  );
+});
+
+// Guarda de processo, nao de dado. Uma secao nova no kit que ninguem classificou
+// nao chega a projeto nenhum e nao avisa: o resumo so olha as chaves do PROJETO,
+// entao a ausencia e invisivel dos dois lados. Este teste quebra no dia em que
+// alguem adicionar uma secao sem decidir se ela sincroniza, mescla ou preserva.
+test('every top-level section of the shipped catalog has an owner', () => {
+  const shippedKeys = Object.keys(parse(readFileSync(shipped, 'utf8')));
+  const classified = new Set([...SYNCED, ...MERGED, ...PRESERVED, 'risk_domains']);
+  const orphans = shippedKeys.filter((key) => !classified.has(key));
+  assert.deepEqual(orphans, [], `unclassified in sync-routing.mjs: ${orphans.join(', ')}`);
 });
