@@ -58,14 +58,9 @@ cli_runners:
     binary: "<binario>"
     argv: ["--model", "{model}", "{prompt}"]   # cada elemento vira UM argumento
     prompt_delivery: argv | file | stdin
-    command_template: "..."                    # legado do schema 1 (string de shell)
-    provides:
-      providers: [<provedor>, ...]             # quais provedores este runner executa
-      models: [<chave-do-catalogo>, ...]       # ou modelos específicos
     effort:
       supported: false                         # declare `true` só se a CLI aplica mesmo
-      argv: ["--effort", "{effort}"]
-      mapping: { low: ..., high: ..., max: ... }
+      argv: ["--effort", "{effort}"]            # o nível vai cru, sem tradução
     observed_model:                            # como descobrir quem atendeu
       bin: "<comando>"
       argv: ["{run_dir}"]
@@ -202,27 +197,28 @@ task pode então virar comando. Com `argv`, cada elemento é passado direto ao
 processo, sem shell no meio — conteúdo de task não consegue escapar. Prefira
 também `prompt_delivery: stdin` ou `file` quando a CLI suportar.
 
-### Resolver qual runner executa qual modelo
+### Resolver qual runner executa o combo
 
-1. Se o slot ou o projeto fixou um runner, use-o.
-2. Senão, procure um `cli_runners` cujo `provides.models` contenha a chave do
-   modelo.
-3. Senão, um cujo `provides.providers` contenha o provedor do modelo.
-4. Exatamente um candidato → use. Vários e sem preferência → pergunte ao humano.
-   Nenhum → bloqueie.
+O combo é alcançado pelo gateway, e qualquer CLI configurada para falar com ele
+serve. Por isso o runner é **escolha direta**, e não algo deduzido do modelo:
 
-Nunca assuma um mapeamento fixo entre provedor e CLI.
+1. Se o combo declarar `runner`, use-o.
+2. Senão, use `default_runner`.
+3. Se o runner resolvido estiver desligado em `runner_policy`, **bloqueie e
+   avise** — não troque por outro por conta própria.
 
 ### Effort
 
-`modelo + effort` é a unidade real de execução. Se o runner não declarar
-`effort.supported: true`:
+O `effort` vem de `combos.<nome>.effort` e vai cru na requisição: o valor escrito
+lá é o que o provedor recebe. Não traduza e não invente nível.
 
-- **não registre** que o effort foi aplicado;
-- se o modelo já atinge o perfil exigido na variante `default`, prossiga e
-  registre a limitação;
-- se o modelo só atinge o perfil exigido acima da variante `default`, o effort é
-  o que o torna elegível: **bloqueie**. O validador rejeita esse caso.
+Se o runner não declarar `effort.supported: true`, ele não tem como repassar o
+nível. Nesse caso **não registre que o effort foi aplicado** — registre o que
+foi pedido e nada além disso.
+
+O protocolo não devolve o nível aplicado, então `effort` no registro é sempre
+declaração. O que volta e é mensurável é `reasoning_tokens`: grave quando o
+provedor reportar e omita quando não reportar.
 
 > **Dica:** Para reconfigurar as CLIs e modelos do projeto, execute o atalho `/lnx-configurar-roteamento`.
 
@@ -230,17 +226,14 @@ Nunca assuma um mapeamento fixo entre provedor e CLI.
 
 ## 4. Quando a task já tem roteamento
 
-Se a task possui `model_plan.schema: 2`, o roteamento **já foi decidido** pelo
-Planner e persistido como contrato:
+O `model_plan` foi decidido pelo Planner e é contrato:
 
-- não escolha o modelo de novo;
-- use `default`;
-- `alt1`/`alt2` são alternativas **laterais** (indisponibilidade, rate limit,
-  custo, provedor, especialização, preferência humana) — não são retry;
-- `upgrade_alt1`/`upgrade_alt2` são escalada **vertical**, só depois de esgotar
-  o budget de rework ou quando a tarefa se revelou materialmente maior;
-- o effort vem junto do modelo, no mesmo slot;
-- registre em `model_execution` qual slot foi usado (`selection`).
+- não escolha de novo — o combo de cada papel já está no plano;
+- o `effort` vem junto, no mesmo bloco;
+- registre em `model_execution` o `combo` pedido e, em `model`, **o modelo que o
+  campo `model` da resposta informou**. Gravar o nome do combo ali não registra
+  nada, porque o combo já estava no plano;
+- grave `reasoning_tokens` quando o provedor reportar.
 
 A coordenação completa (gates de teste/review, rework, upgrade, terminais
 visíveis) está em `.ai/guidelines/core/orchestration.md`.

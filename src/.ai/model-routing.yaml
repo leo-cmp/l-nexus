@@ -71,51 +71,23 @@ execution_policy:
   max_upgrades: 1
   max_total_execution_attempts: 3
 
-# Recomendações de roteamento por tipo de trabalho. É a entrada declarativa do
-# Planner: ele escolhe aqui os slots concretos e os PERSISTE na task, que passa a
-# ser o contrato. Estas entradas são recomendações do projeto, nunca decisões
-# fixas de código — troque livremente os modelos abaixo.
+# As tres regras que moldaram este arquivo, todas vindas de defeito observado:
 #
-# Slots:
-#   default                     preferência normal
-#   alt1 / alt2                 alternativas LATERAIS (indisponibilidade, custo,
-#                               rate limit, provedor, especialização, preferência
-#                               humana) — não são uma escada de retry
-#   upgrade_alt1 / upgrade_alt2 escalada VERTICAL, só depois de esgotar rework ou
-#                               quando a tarefa se revelou materialmente maior
-# Effort permitido: default | low | high | max
-# Recomendacoes de roteamento por tipo de trabalho. E a entrada declarativa do
-# Planner: ele escolhe aqui os slots concretos e os PERSISTE na task, que passa a
-# ser o contrato.
+# 1. PAPEIS DISJUNTOS. Um modelo nao serve dois papeis. Se o mesmo modelo pode
+#    cair em executor e revisor, mais cedo ou mais tarde ele revisa o proprio
+#    trabalho e o portao vira carimbo. Aconteceu. Com combo isso e INVISIVEL
+#    daqui: dois combos distintos podem resolver para o mesmo modelo. Quem
+#    garante a disjuncao e quem monta os combos; o kit so consegue conferir
+#    depois, comparando os modelos que de fato responderam.
 #
-# Tres regras moldam as rotas abaixo, e todas vieram de defeito observado:
+# 2. NENHUM PAPEL DE GATE COM UMA FONTE SO. Quando a cota esgota e nao sobra
+#    alternativa legitima, o agente nao para: ele fabrica uma. Ja houve caso de
+#    Orchestrator EDITAR o proprio contrato para legalizar a escolha. Hoje quem
+#    resolve isso e o fallback do gateway, uma camada abaixo -- e por isso os
+#    slots alternativos deixaram de existir aqui.
 #
-# 1. PAPEIS DISJUNTOS. Um modelo nao se repete entre executor, tester e
-#    reviewer, nem como alternativa. Se o mesmo modelo pode cair em dois papeis,
-#    mais cedo ou mais tarde ele testa e revisa o proprio trabalho, e o gate
-#    vira carimbo. Aconteceu.
-#
-# 2. NENHUM PAPEL DE GATE COM UMA FONTE SO. Quando a cota de um provedor esgota
-#    e nao sobra alternativa legitima, o agente nao para: ele fabrica uma. Ja
-#    houve caso de Orchestrator EDITAR o proprio contrato para legalizar a
-#    escolha. A saida nao e instruir mais, e nunca criar o beco.
-#
-# 3. O CARO FICA NO FIM. Modelos de cota curta entram como ultima alternativa
-#    lateral, nunca como default. Modelos que cobram direto da conta do humano
-#    ficam nos slots de upgrade e dependem de `runner_policy`.
-#
-# 4. ENTRADA QUE E CONJUNTO NAO REPETE MEMBRO. Quando uma entrada do catalogo
-#    resolve para um POOL de modelos, e nao para um so, dois pools de papeis
-#    diferentes nao podem compartilhar membro. De fora sao dois nomes distintos
-#    e a regra 1 aprova; no dia em que a cota apertar, os dois caem no mesmo
-#    modelo e o executor revisa a si mesmo. O validador nao ve isso -- ele
-#    confere nomes, nao composicao. Quem garante e quem escreve este arquivo.
-#
-# Slots:
-#   default                     preferencia normal
-#   alt1 / alt2                 alternativas LATERAIS, em ordem de preferencia;
-#                               a ultima e tipicamente a de cota mais curta
-#   upgrade_alt1 / upgrade_alt2 escalada VERTICAL, so depois de esgotar rework
+# 3. O CARO FICA DESLIGADO POR PADRAO. Runner que cobra direto da conta do
+#    humano so entra por decisao consciente, via `runner_policy`.
 
 risk_domains:
   generic_r3:
@@ -128,9 +100,6 @@ risk_domains:
     - backup-restore-deployment
     - material-concurrency-idempotency
   project: []
-
-# Piso obrigatório por risco. `work_routes` escolhe modelos DENTRO deste piso e
-# nunca pode enfraquecê-lo: o validador confere os slots contra estas rotas.
 
 # Runners que consomem credito PAGO DIRETO da conta do humano, fora das
 # assinaturas de opencode e agy. Ficam desligados por padrao: um roteamento que

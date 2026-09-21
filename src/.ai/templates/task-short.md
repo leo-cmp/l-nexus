@@ -7,53 +7,26 @@ risk:
   level: R1
   domains: []
   rationale: "[por que a mudanca e localizada, reversivel e de baixo impacto]"
-routing:
-  work_type: "[work type]"
-  categories: []
-  technologies: []
-  required_capabilities: []
 # Um modelo nao pode aparecer em dois papeis. Ao terminar de preencher, congele:
 #   npx @leo-cmp/l-nexus validate-task <caminho-da-task> --write-plan-hash
 model_plan:
-  schema: 2
+  schema: 3
   created_by:
     agent: "[agente]"
     provider: "[provedor ou unknown]"
     model: "[modelo exato ou unknown]"
+  # Qual combo cada papel usa sai de `roles` no model-routing.yaml, pelo nivel de
+  # risco -- nao ha escolha a fazer aqui, e por isso nao ha o que justificar.
+  # O `effort` e o que o combo declara; copie, nao invente.
   executor:
-    required_profile: economical
-    required_capabilities: []
-    default:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    alt1:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    alt2:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    upgrade_alt1:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    upgrade_alt2:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
+    combo: "[combo de roles.executor]"
+    effort: "[effort declarado para o combo]"
   tester:
-    required: false
-    required_profile: economical
-    default:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
+    combo: "[combo de roles.tester, ou remova se o risco nao exige teste]"
+    effort: "[effort declarado para o combo]"
   reviewer:
-    required: false
-    required_profile: economical
-    independent_model: false
-    cross_provider_required: false
-    default:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-routing_rationale:
-  executor: "[por que este executor e este effort]"
+    combo: "[combo de roles.reviewer, ou remova se o risco nao exige revisao]"
+    effort: "[effort declarado para o combo]"
 orchestration:
   mode: manual
   state: pending
@@ -66,17 +39,15 @@ model_execution:
     agent: ""
     provider: ""
     model: ""
-    effort: ""
     started_at: ""
   executor:
-    selection: ""
-    agent: ""
-    provider: ""
+    combo: ""
+    # O modelo que o gateway informou no campo `model` da RESPOSTA -- nao o nome
+    # do combo, e nao o que o modelo diz de si.
     model: ""
     effort: ""
     runner: ""
     started_at: ""
-    attempts: 0
   tests: []
   reviews: []
 ---

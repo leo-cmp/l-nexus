@@ -14,10 +14,9 @@ obrigatorios em serie so para preencher uma task.
 - Consultar `AGENTS.md`, `.ai/roles/index.md`, `.ai/model-routing.yaml` e
   `.ai/guidelines/core/model-selection.md`.
 - Classificar complexidade e risco separadamente.
-- Resolver perfis por risco e indicar somente modelos ativos e avaliados do
-  catalogo do projeto, considerando `profile_by_variant[effort]`.
-- Recomendar modelo E esforco juntos: `modelo + effort` e a unidade real de
-  execucao.
+- Resolver o combo de cada papel por `roles`, pelo nivel de risco, e o `effort`
+  por `combos`. Nao indique modelo: o kit nao escolhe modelo, e o combo e a
+  unidade de roteamento.
 - Informar a politica de revisao aplicavel antes da execucao.
 - Se a demanda exigir decisao de escopo ou criacao de task, assumir `technical-lead` quando o roteamento permitir.
 - Gerar sempre um bloco copiavel `Envie para o [AGENTE]`.

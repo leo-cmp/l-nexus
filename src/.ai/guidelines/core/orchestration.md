@@ -21,9 +21,9 @@ sem reduzir silenciosamente política de risco.
 ```text
 ROLE            planner | orchestrator | executor | tester | reviewer
                               ↓
-MODEL ROUTING   default | alt1 | alt2 | upgrade_alt1 | upgrade_alt2  (+ effort)
+MODEL ROUTING   combo do papel (+ effort declarado pelo combo)
                               ↓
-CLI RUNNER      como aquele modelo é efetivamente executado
+CLI RUNNER      qual CLI fala com o gateway
                               ↓
 TERMINAL RUNNER como aquela execução fica visível ao humano
 ```
@@ -73,13 +73,10 @@ compatível com o schema anterior.
 5. determinar quais gates são obrigatórios (review e teste) pelo risco + política.
 
 ### PREPARE
-Resolver `executor.default`, `tester.default` e `reviewer.default` e confirmar:
-- o modelo existe no catálogo e está `active`;
-- `profile_by_variant[effort]` atende o perfil mínimo da rota;
-- capabilities atendem `required_capabilities`;
-- R3 tem identidades verificáveis (`unknown` não executa R3);
-- cross-provider respeitado quando exigido;
-- existe um `cli_runners` capaz de executar aquele modelo;
+Ler o combo de cada papel no plano e confirmar:
+- o combo existe em `combos`;
+- o runner resolvido (`combos.<nome>.runner` ou `default_runner`) existe em
+  `cli_runners` e não está desligado em `runner_policy`;
 - existe um adaptador de terminal disponível.
 
 ### EXECUTE
@@ -144,19 +141,15 @@ acima do budget, o que torna o loop infinito impossível por contrato.
 
 ---
 
-## 4. Slots: laterais × verticais
+## 4. Quando um modelo não responde
 
-- `default` — preferência normal.
-- `alt1` / `alt2` — alternativas **laterais**: indisponibilidade, rate limit,
-  custo, provedor, especialização, restrição do runtime, preferência humana.
-  **Não** significam "o default falhou".
-- `upgrade_alt1` / `upgrade_alt2` — escalada **vertical**, apenas nos casos
-  acima.
+Indisponibilidade, rate limit e cota esgotada são tratados pelo **gateway**, uma
+camada abaixo: ele tem a lista de modelos do combo e escolhe outro sem que o
+Orchestrator saiba. Por isso não há alternativa a escolher aqui.
 
-Trocar `default` por `alt1` por indisponibilidade **não** é falha de qualidade e
-não consome budget de rework. Registre sempre o slot em `selection`.
-
----
+Se o próprio combo falhar, isso é falha de execução como qualquer outra: registre
+e siga o orçamento de rework. Nunca edite o `model_plan` para fazer a execução
+passar a bater com ele — foi assim que o defeito que originou este kit começou.
 
 ## 5. Terminais visíveis
 
@@ -363,27 +356,23 @@ Se o `cli_runners` escolhido não declarar `effort.supported: true`:
 
 ### Pode
 - invocar o executor já planejado;
-- trocar `default` por `alt1`/`alt2` por indisponibilidade ou política permitida;
 - enviar rework; rerodar testes; rerodar review;
-- usar upgrade dentro do budget;
 - resumir logs; encerrar processo travado; marcar `blocked`;
 - registrar evidências e apresentar o relatório final.
 
 ### Não pode
 - reduzir `risk.level` nem transformar R3 em R2;
 - pular review obrigatório ou gate de teste obrigatório;
-- remover exigência de cross-provider;
-- aceitar modelo abaixo do perfil mínimo na variante usada;
-- aceitar identidade `unknown` em R3;
+- registrar o nome do combo no campo `model` da execução, em vez do modelo que
+  a resposta informou;
 - mudar critério de aceite ou aumentar escopo silenciosamente;
 - editar código diretamente como comportamento padrão;
 - aprovar a própria implementação;
 - ignorar teste falhando ou tratar review stale como válido;
-- **editar `model_plan` de qualquer forma** — inclusive *acrescentar* um slot,
-  trocar o modelo de um slot existente ou reescrever `routing_rationale`. Já
-  houve caso real de Orchestrator acrescentar um `alt2` ao plano do reviewer e
-  reescrever o rationale para justificá-lo, no mesmo commit em que registrou a
-  execução. O contrato passou a "bater" porque o contrato tinha sido reescrito.
+- **editar `model_plan` de qualquer forma** — inclusive trocar o combo de um
+  papel. Já houve caso real de Orchestrator acrescentar um slot ao plano do
+  reviewer e reescrever a justificativa para legalizá-lo, no mesmo commit em que
+  registrou a execução. O contrato passou a "bater" porque o contrato tinha sido reescrito.
   Editar o plano para que a própria escolha caiba nele **é** replanejar, e é a
   forma mais difícil de detectar, porque não deixa nada em falta — deixa tudo
   coerente. Por isso o plano é congelado na criação: `model_plan.plan_hash`
@@ -498,10 +487,11 @@ fabricado. A segunda parece pronta.
 
 ### Procedimento
 
-1. **Tente os alternates planejados, na ordem declarada.** `alt1`, `alt2`,
-   `alt3`. Eles existem para isto.
-2. **Esgotados os alternates do papel, pare.** Não invente slot, não reutilize o
-   modelo de outro papel, não edite o plano.
+1. **Cota e indisponibilidade são do gateway.** Ele tem a lista de modelos do
+   combo e troca sozinho; se mesmo assim o combo falhou, não há alternativa a
+   tentar deste lado.
+2. **Pare.** Não troque o combo, não reutilize o combo de outro papel, não edite
+   o plano.
 3. Registre `orchestration.state: blocked` e, no bloco do papel afetado, o
    veredito `blocked` com o motivo — qual cota, qual provedor, quando reseta.
 4. **Avise o humano pelo nudge**, conforme `.ai/guidelines/core/nudge.md`. Cota

@@ -14,72 +14,31 @@ risk:
 # Classificacao funcional. Alimenta a escolha de work_route em .ai/model-routing.yaml.
 # work_type sugerido: planning | implementation | bugfix | refactor | testing |
 #   review | system-design | documentation | migration | investigation
-routing:
-  work_type: "[work type]"
-  categories: []
-  technologies: []
-  required_capabilities: []
 # Contrato de roteamento resolvido pelo Planner e executado pelo Orchestrator.
-# default             preferencia normal
-# alt1 / alt2 / alt3  alternativas LATERAIS (indisponibilidade, custo, rate limit,
-#                     provedor, especializacao, preferencia humana) — nao sao retry.
-#                     alt3 e opcional e fecha a fila: e o lugar do modelo de cota
-#                     curta. Duas laterais iguais nao sao duas alternativas.
-# upgrade_alt*        escalada VERTICAL, so apos esgotar rework ou quando a tarefa
-#                     se revelou materialmente maior
-# effort: default | low | high | max — resolve a elegibilidade via profile_by_variant
-# Os valores de `model` sao CHAVES do catalogo `models:` do model-routing.yaml.
-# Um modelo nao pode aparecer em dois papeis: quem executa nao testa nem revisa.
+# O combo de cada papel sai de `roles` no model-routing.yaml, pelo nivel de risco;
+# o effort sai de `combos`. Nao ha modelo a escolher: quem escolhe e o gateway.
 # Ao terminar de preencher, congele o bloco:
 #   npx @leo-cmp/l-nexus validate-task <caminho-da-task> --write-plan-hash
 # A flag grava `plan_hash` aqui. Depois disso, mexer em qualquer slot e
 # replanejar — precisa do humano, nunca de um hash regravado.
 model_plan:
-  schema: 2
+  schema: 3
   created_by:
     agent: "[agente]"
     provider: "[provedor ou unknown]"
     model: "[modelo exato ou unknown]"
+  # Qual combo cada papel usa sai de `roles` no model-routing.yaml, pelo nivel de
+  # risco -- nao ha escolha a fazer aqui, e por isso nao ha o que justificar.
+  # O `effort` e o que o combo declara; copie, nao invente.
   executor:
-    required_profile: "[economical | balanced | frontier]"
-    required_capabilities: []
-    default:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    alt1:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    alt2:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    alt3:
-      model: "[chave do catalogo ou remova o slot]"
-      effort: "[default | low | high | max]"
-    upgrade_alt1:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-    upgrade_alt2:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
+    combo: "[combo de roles.executor]"
+    effort: "[effort declarado para o combo]"
   tester:
-    required: "[true | false]"
-    required_profile: "[economical | balanced | frontier]"
-    default:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
+    combo: "[combo de roles.tester, ou remova se o risco nao exige teste]"
+    effort: "[effort declarado para o combo]"
   reviewer:
-    required: "[true | false]"
-    required_profile: "[economical | balanced | frontier]"
-    independent_model: "[true | false]"
-    cross_provider_required: "[true | false]"
-    default:
-      model: "[chave do catalogo]"
-      effort: "[default | low | high | max]"
-routing_rationale:
-  executor: "[por que este executor e este effort]"
-  tester: "[por que este tester, ou por que nao ha gate de teste]"
-  reviewer: "[por que este revisor e esta politica de independencia]"
-  upgrades: "[quando os upgrades sao permitidos]"
+    combo: "[combo de roles.reviewer, ou remova se o risco nao exige revisao]"
+    effort: "[effort declarado para o combo]"
 # Subestado do workflow. `status` acima continua sendo o estado macro.
 orchestration:
   mode: manual
@@ -89,23 +48,29 @@ orchestration:
     reworks: 0
     upgrades: 0
 # Proveniencia real. Preenchida durante a execucao, nunca antecipada.
-# `selection` registra qual slot foi de fato usado (default/alt1/alt2/upgrade_alt*).
 model_execution:
   orchestrator:
     agent: ""
     provider: ""
     model: ""
-    effort: ""
     started_at: ""
   executor:
-    selection: ""
-    agent: ""
-    provider: ""
+    combo: ""
+    # O modelo que o gateway informou no campo `model` da RESPOSTA. Nao e o nome
+    # do combo e nao e o que o modelo diz de si -- perguntado, ele so conhece o
+    # combo. Este campo e a unica prova de quem atendeu.
     model: ""
     effort: ""
+    # So quando o provedor reporta. Nem todos reportam; nesse caso remova a
+    # linha em vez de inventar numero.
+    reasoning_tokens: 0
     runner: ""
+    run_id: ""
     started_at: ""
-    attempts: 0
+  # Cada entrada repete a mesma forma do executor, mais `commit`, `verdict` e
+  # -- na revisao -- `findings`. O `model` de cada uma tem que ser o modelo real,
+  # porque e comparando esses nomes que se sabe se alguem assinou o proprio
+  # trabalho.
   tests: []
   reviews: []
 issue: "[URL da issue GitHub]"
