@@ -8,6 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { parse } from 'yaml';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rootDirectory = path.dirname(scriptsDirectory);
@@ -130,32 +131,105 @@ test('E2E 10 — discovering an R3 domain forbids keeping the task at R2', () =>
   assert.match(result.stderr, /must be R3 because domain payments-money is configured as mandatory R3/);
 });
 
-test('every work_routes slot in the shipped catalog is usable', () => {
-  const routing = readFileSync(shippedRouting, 'utf8');
-  const models = new Map();
-  let currentKey = null;
-  let inModels = false;
-  for (const line of routing.split('\n')) {
-    if (/^models:/.test(line)) { inModels = true; continue; }
-    if (inModels && /^[a-z_]+:/.test(line)) inModels = false;
-    if (!inModels) continue;
-    const key = line.match(/^ {2}([a-z0-9-]+):$/);
-    if (key) { currentKey = key[1]; models.set(currentKey, { variants: new Set() }); continue; }
-    if (!currentKey) continue;
-    const status = line.match(/^ {4}status: (\S+)$/);
-    if (status) models.get(currentKey).status = status[1];
-    const variant = line.match(/^ {6}(default|low|high|max): (\S+)$/);
-    if (variant) models.get(currentKey).variants.add(variant[1]);
+// Le o catalogo com o parser de YAML em vez de regex. A versao anterior exigia a
+// forma `{ model: x, effort: y }` e por isso enxergava 62 dos 85 slots: slot de
+// pool e escrito sem effort, entao os cinco pools do 9router entraram no
+// catalogo sem passar por guarda nenhuma. Regex sobre YAML so ve a forma que
+// quem escreveu imaginou; o parser ve o que esta la.
+function shippedCatalog() {
+  return parse(readFileSync(shippedRouting, 'utf8'));
+}
+
+function workRouteSlots(routing) {
+  const slots = [];
+  for (const [route, roles] of Object.entries(routing.work_routes ?? {})) {
+    for (const [role, candidates] of Object.entries(roles ?? {})) {
+      for (const [slot, value] of Object.entries(candidates ?? {})) {
+        if (!value || typeof value !== 'object' || !value.model) continue;
+        slots.push({ where: `${route}.${role}.${slot}`, model: value.model, effort: value.effort });
+      }
+    }
   }
-  assert.ok(models.size > 0, 'no models parsed from the shipped catalog');
+  return slots;
+}
+
+test('every work_routes slot in the shipped catalog is usable', () => {
+  const routing = shippedCatalog();
+  const slots = workRouteSlots(routing);
+  assert.ok(slots.length > 0, 'no work_routes slots parsed from the shipped catalog');
 
   const problems = [];
-  const workRoutes = routing.slice(routing.indexOf('\nwork_routes:'), routing.indexOf('\ncli_runners:'));
-  for (const [, model, effort] of workRoutes.matchAll(/\{ model: ([a-z0-9.-]+), effort: (\w+) \}/g)) {
-    const entry = models.get(model);
-    if (!entry) problems.push(`${model} is not a catalog key`);
-    else if (entry.status !== 'active') problems.push(`${model} is ${entry.status}, not active`);
-    else if (!entry.variants.has(effort)) problems.push(`${model} declares no profile_by_variant.${effort}`);
+  for (const { where, model, effort } of slots) {
+    const entry = routing.models?.[model];
+    if (!entry) { problems.push(`${where}: ${model} is not a catalog key`); continue; }
+    if (entry.status !== 'active') problems.push(`${where}: ${model} is ${entry.status}, not active`);
+    if (effort !== undefined && !(effort in (entry.profile_by_variant ?? {}))) {
+      problems.push(`${where}: ${model} declares no profile_by_variant.${effort}`);
+    }
+  }
+  assert.deepEqual(problems, [], problems.join('\n'));
+});
+
+// A guarda acima pergunta "esse modelo existe?" e essa pergunta "da para
+// EXECUTAR esse modelo?". Sao coisas diferentes, e a distancia entre elas foi
+// por onde o defeito passou: os pools ganharam `provider: meituan` e
+// `provider: xiaomi` na secao `models` e nenhum runner declarou esses
+// provedores 300 linhas abaixo, na mesma arquivo. O catalogo sabia QUEM era o
+// modelo e nao sabia POR ONDE ele roda, entao o Orchestrator bloquearia na
+// largada de qualquer projeto novo.
+//
+// A resolucao replica cli-delegation.md: `provides.models` vence
+// `provides.providers`, e a partir dai um unico candidato resolve, varios
+// obrigam a perguntar ao humano e nenhum bloqueia. Um default que faz o
+// Orchestrator perguntar nao e default.
+//
+// Candidato desligado por `runner_policy` NAO entra na conta de defeito: e
+// estado deliberado e documentado -- `claude` e `codex` cobram por token e ficam
+// desligados de proposito. O que o teste exige nesse caso e que exista candidato
+// a ligar, ou seja, que o unico obstaculo seja a politica e nao a ausencia de
+// mapeamento.
+function resolveRunners(routing, modelKey) {
+  const runners = Object.entries(routing.cli_runners ?? {});
+  const provider = routing.models?.[modelKey]?.provider;
+  const byModel = runners.filter(([, c]) => (c.provides?.models ?? []).includes(modelKey));
+  const candidates = byModel.length > 0
+    ? byModel
+    : runners.filter(([, c]) => (c.provides?.providers ?? []).includes(provider));
+  const names = candidates.map(([name]) => name);
+  const enabled = names.filter((name) => routing.runner_policy?.[name]?.enabled !== false);
+  return { names, enabled };
+}
+
+test('every work_routes slot resolves to exactly one runner the project may use', () => {
+  const routing = shippedCatalog();
+  const problems = [];
+  for (const { where, model } of workRouteSlots(routing)) {
+    if (!routing.models?.[model]) continue; // ja reportado pela guarda acima
+    const { names, enabled } = resolveRunners(routing, model);
+    if (names.length === 0) {
+      problems.push(`${where}: no cli_runners entry provides ${model} (provider ${routing.models[model].provider})`);
+    } else if (enabled.length > 1) {
+      problems.push(`${where}: ${model} resolves to ${enabled.length} runners (${enabled.join(', ')}); the orchestrator would have to ask`);
+    }
+  }
+  assert.deepEqual(problems, [], problems.join('\n'));
+});
+
+// Terceira forma da mesma pergunta. `effort_levels` foi levantado do painel de
+// cada gateway e existe porque pedir um nivel que o modelo nao aceita devolve
+// HTTP 400 -- faz parte da elegibilidade, nao e decoracao. Uma rota que pede
+// `high` de um modelo sem controle de raciocinio registra um esforco que nunca
+// acontece, e e o registro que depois vira prova de que a task rodou como foi
+// planejada. Lista vazia significa modelo sem controle nenhum: aceita so o
+// implicito, entao qualquer nivel nomeado ali e ficcao.
+test('no work_routes slot requests an effort level its model does not declare', () => {
+  const routing = shippedCatalog();
+  const problems = [];
+  for (const { where, model, effort } of workRouteSlots(routing)) {
+    if (effort === undefined || effort === 'default') continue;
+    const levels = routing.models?.[model]?.effort_levels;
+    if (!Array.isArray(levels) || levels.includes(effort)) continue;
+    problems.push(`${where}: asks ${model} for effort ${effort}, but it declares ${JSON.stringify(levels)}`);
   }
   assert.deepEqual(problems, [], problems.join('\n'));
 });

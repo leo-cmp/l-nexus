@@ -30,6 +30,9 @@ runner_policy:
   codex:
     enabled: false
     conta: "API OpenAI do humano, cobrada por token"
+  qwen:
+    enabled: false
+    conta: "Assinatura Qwen Code, nao contratada; os modelos alibaba sao alcancados por opencode-qwen"
 
 profiles:
   economical:
@@ -777,7 +780,7 @@ work_routes:
   backend-implementation:
     executor:
       default: { model: 9r-executor-frontier }
-      alt1: { model: meituan-longcat-2-0, effort: high }
+      alt1: { model: meituan-longcat-2-0 }
       alt2: { model: anthropic-sonnet-4-6, effort: default }
       upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
       upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
@@ -821,7 +824,7 @@ work_routes:
   sql-migration:
     executor:
       default: { model: 9r-executor-frontier }
-      alt1: { model: meituan-longcat-2-0, effort: high }
+      alt1: { model: meituan-longcat-2-0 }
       alt2: { model: anthropic-sonnet-4-6, effort: default }
       upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
       upgrade_alt2: { model: openai-gpt-5-6-sol, effort: max }
@@ -853,7 +856,7 @@ work_routes:
   refactor:
     executor:
       default: { model: 9r-executor-frontier }
-      alt1: { model: meituan-longcat-2-0, effort: high }
+      alt1: { model: meituan-longcat-2-0 }
       alt2: { model: anthropic-sonnet-4-6, effort: default }
       upgrade_alt1: { model: deepseek-v4-1-flash, effort: max }
     tester:
@@ -976,7 +979,13 @@ cli_runners:
       argv: ["--auto"]
     default_model: "deepseek-v4-flash"
     provides:
-      providers: []
+      # meituan e xiaomi nao tem CLI propria nem entrada por familia: opencode e
+      # o unico caminho ate eles, e nenhum outro runner os declara. Sem isto o
+      # modelo existe no catalogo e nao tem por onde rodar -- o Planner o coloca
+      # no slot e o Orchestrator bloqueia na largada. Cabem aqui, e nao numa
+      # entrada por familia, porque os dois declaram `effort_levels: []`: nao ha
+      # vocabulario de esforco para traduzir.
+      providers: [ meituan, xiaomi ]
       models: []
     effort:
       # DESLIGADO de proposito nesta entrada generica. O `--variant` repassa o
