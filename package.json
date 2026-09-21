@@ -1,7 +1,7 @@
 {
   "name": "@leo-cmp/l-nexus",
   "version": "0.12.5",
-  "description": "Central portátil de configuração e diretrizes para agentes de IA — skills, roles, guidelines e templates versionados",
+  "description": "Central port\u00e1til de configura\u00e7\u00e3o e diretrizes para agentes de IA \u2014 skills, roles, guidelines e templates versionados",
   "bin": {
     "l-nexus": "scripts/cli.mjs"
   },
@@ -14,7 +14,6 @@
     "scripts/install.sh",
     "scripts/update.sh",
     "scripts/validate-task-routing.mjs",
-    "scripts/migrate-task-routing.mjs",
     "scripts/migrate-routing.mjs",
     "scripts/sync-routing.mjs",
     "MODEL_REQUIREMENTS.md",

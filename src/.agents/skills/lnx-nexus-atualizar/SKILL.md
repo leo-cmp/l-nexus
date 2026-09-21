@@ -85,7 +85,6 @@ description: Atualiza o pacote l-nexus para a versao mais recente via npx update
 7. **Tasks existentes:** continuam validas no schema antigo e **nao** precisam
    migrar. Se o usuario quiser adotar o contrato novo numa task especifica:
    ```bash
-   npx @leo-cmp/l-nexus migrate-task <caminho-da-task> --to 2 --write
    ```
    Essa migracao nao inventa modelo nem effort: ela marca a task com
    `needs_manual_routing` e o validador reprova ate um humano completar o

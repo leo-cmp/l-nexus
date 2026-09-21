@@ -26,26 +26,18 @@
 - Toda task local deve ter issue vinculada (GitHub ou local) antes de ir para execucao, salvo bloqueio explicito.
 - Ao criar task, atualize `plan.md` com status, issue, progresso/listas e ordem de execucao.
 - Toda task executavel deve declarar no cabecalho `complexity`, `risk`,
-  `routing`, `model_plan`, `routing_rationale`, `orchestration` e
-  `model_execution`, conforme `.ai/templates/task.md`.
-- O bloco `routing` classifica funcionalmente a demanda: `work_type`,
-  `categories`, `technologies` e `required_capabilities`. E o que permite o
-  Planner escolher a entrada certa de `work_routes`.
+  `model_plan`, `orchestration` e `model_execution`, conforme
+  `.ai/templates/task.md`.
 - Complexidade mede escopo e coordenacao; risco mede a consequencia de uma
   implementacao incorreta. Classifique os dois e nunca use quantidade de
   arquivos como substituto do risco.
-- Consulte `.ai/model-routing.yaml` para resolver perfil de executor, slots de
-  modelo e politica de revisao/teste. Nao fixe fornecedor como preferencia
-  global e nao acople modelo a uma CLI especifica.
-- O Planner resolve e PERSISTE o roteamento completo na task: para o executor,
-  os slots (`default`, `alt1`, `alt2`, o opcional `alt3`, `upgrade_alt1`,
-  `upgrade_alt2`), cada um com seu `effort`; para tester e reviewer, ao menos o
-  `default`. `alt1`/`alt2`/`alt3` sao alternativas laterais, `upgrade_alt*` sao
-  escalada vertical. Nenhum modelo pode servir dois papeis do mesmo plano.
+- Consulte `.ai/model-routing.yaml` para resolver o combo de cada papel e a
+  politica de revisao e teste. O combo sai de `roles`, pelo nivel de risco; o
+  `effort` sai de `combos`. Nao ha escolha de modelo a fazer: quem escolhe o
+  modelo e o gateway, e por isso nao ha nada a justificar no plano.
 - Resolvido o roteamento, o Planner congela o bloco com
   `validate-task <task> --write-plan-hash`. Dali em diante o `model_plan` e
   contrato verificavel, nao texto que o executor possa ajustar a propria escolha.
-- Cada escolha precisa ser auditavel em `routing_rationale`.
 - Risco R2 ou R3 exige `risk.rationale` explicando o impacto concreto da falha.
 - Dominios listados em `risk_domains.generic_r3` sao R3 por padrao. O projeto
   pode acrescentar dominios, mas nao rebaixar um dominio R3 obrigatorio.
@@ -53,14 +45,9 @@
   `project_policy.r2_review`. R1 permite revisao opcional.
 - O bloco de risco e roteamento deve ficar no front matter para que a decisao
   seja visivel e validavel sem interpretar texto livre.
-- Tasks legadas com `modelo_recomendado`, `substitutos` e `motivo` devem passar
-  por `l-nexus migrate-task <task> --write`. Revise a classificacao conservadora
-  `R3/legacy-unclassified` antes da execucao; a migracao nao comprova identidade
-  nem revisao historica.
-- Tasks no schema 1 continuam validas. Para adotar os slots, rode
-  `l-nexus migrate-task <task> --to 2 --write`: a migracao reformata a task mas
-  nao inventa modelo nem effort, marca `needs_manual_routing: true` e o
-  validador reprova ate um humano completar o roteamento e remover a marca.
+- Task planejada antes da schema 3 continua valida e nao precisa ser convertida.
+  Ela grava o modelo real em `model_execution`, que e o que as regras atuais
+  leem. Reescrever plano fechado so para mudar de formato e reescrever historico.
 - Ao criar nova task, use o template de `.ai/templates/task.md` como base.
 - Para tarefas L1/R1, use `.ai/templates/task-short.md`. Uma task pequena com
   risco R2 ou R3 usa obrigatoriamente o template completo.

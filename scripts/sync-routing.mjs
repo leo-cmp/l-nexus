@@ -29,7 +29,10 @@ const SHIPPED_ROUTING = path.join(scriptDirectory, '..', 'src', '.ai', 'model-ro
 
 // O que vem do kit e do mundo. Trocado inteiro, com os comentarios do kit junto:
 // a justificativa de uma rota vale tanto quanto a rota.
-export const SYNCED = ['schema_version', 'profiles', 'models', 'routes', 'execution_policy', 'work_routes'];
+// `combos`, `roles` e `default_runner` sao do kit e sobrescrevem o projeto: o
+// esforco de cada combo e decisao unica, tomada no kit e propagada por versao.
+// Editar no projeto seria criar divergencia silenciosa entre os dois.
+export const SYNCED = ['schema_version', 'routes', 'execution_policy', 'combos', 'roles', 'default_runner'];
 
 // O que e do projeto e da maquina. Nunca tocado.
 export const PRESERVED = ['project_policy', 'runner_policy', 'terminal_runners'];
@@ -227,9 +230,9 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
 
   const depois = projeto.toJS() ?? {};
   const linhas = [];
-  describeMapping('models', antes.models, depois.models, linhas);
-  describeMapping('work_routes', antes.work_routes, depois.work_routes, linhas);
-  for (const chave of ['schema_version', 'profiles', 'routes', 'execution_policy']) {
+  describeMapping('combos', antes.combos, depois.combos, linhas);
+  describeMapping('roles', antes.roles, depois.roles, linhas);
+  for (const chave of ['schema_version', 'routes', 'execution_policy', 'default_runner']) {
     if (!same(antes[chave], depois[chave])) linhas.push(`${chave}: atualizado`);
   }
   if (!same(antes.risk_domains?.generic_r3, depois.risk_domains?.generic_r3)) {

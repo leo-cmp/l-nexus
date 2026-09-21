@@ -13,15 +13,18 @@ e abrir terminais pode assumi-lo. O runtime real e registrado em
 ## Deve fazer
 - Localizar a task ativa e validar o front matter com `l-nexus validate-task`.
 - Confirmar branch/worktree da task e ausencia de alteracoes alheias.
-- Ler o routing persistido e resolver `default` (ou `alt1`/`alt2` quando houver
-  indisponibilidade ou politica que permita).
-- Confirmar elegibilidade: modelo ativo, `profile_by_variant[effort]` no perfil
-  minimo, capabilities atendidas, identidade verificavel em R3, cross-provider
-  quando exigido, CLI runner existente.
+- Ler o routing persistido: o combo de cada papel e o effort ja estao no plano,
+  entao nao ha escolha a refazer. Indisponibilidade e cota sao tratadas pelo
+  gateway, uma camada abaixo.
+- Confirmar que o combo existe em `combos` e que o runner resolvido nao esta
+  desligado em `runner_policy`. Se estiver, bloquear e avisar.
 - Delegar executor, tester e reviewer em terminais visiveis ao usuario, um por
   papel por tentativa, conforme `.ai/guidelines/core/orchestration.md`.
 - Coletar resultado pelo diretorio de execucao (`status`, `exit-code`,
   `output.log`, `result.yaml`), nunca pelo texto da janela.
+- Registrar em `model_execution`, para cada papel, o combo pedido e o modelo que
+  o campo `model` da resposta informou -- nunca o nome do combo no lugar do
+  modelo, e nunca o que o modelo disser sobre si proprio.
 - Encaminhar findings ao executor responsavel e controlar rework.
 - Aplicar upgrade apenas dentro do budget de `execution_policy`.
 - Registrar identidade real, slot usado, effort, runner, tentativas e evidencias.

@@ -33,11 +33,9 @@ Você **não** replaneja a task e **não** implementa o código. Você coordena.
    ```bash
    npx @leo-cmp/l-nexus validate-task <caminho-da-task>
    ```
-   - `task.needs_manual_routing: ...` → a task veio de migração e precisa de um
-     humano. Pare e diga exatamente quais campos faltam.
-   - `task.model_plan.schema` ausente → task no schema 1. Siga
-     `lnx-task-executar` ou peça migração (`migrate-task <task> --to 2`). Não
-     invente slots.
+   - `task.model_plan.<papel>.combo` ausente → o plano é anterior à schema 3.
+     Ele continua válido e não precisa ser convertido: o que as regras atuais
+     leem é o modelo real em `model_execution`.
 4. Confirme branch/worktree da task e que `git status` não mostra alterações
    alheias ao escopo. Se mostrar, pare e pergunte.
 5. Leia `.ai/model-routing.yaml`: `routes`, `project_policy`, `execution_policy`,
@@ -53,14 +51,16 @@ Você **não** replaneja a task e **não** implementa o código. Você coordena.
 
 ## Estado 2 — PREPARE
 
-Para executor, tester e reviewer, resolva o slot `default` e confirme:
+Para executor, tester e reviewer, leia o combo do plano e confirme:
 
-- o modelo existe em `models` e está `status: active`;
-- `profile_by_variant[effort]` atende o perfil mínimo da rota do risco;
-- `capabilities` cobrem `required_capabilities`;
-- em R3, identidades são verificáveis (`unknown` não executa nem aprova R3);
-- executor e reviewer são modelos diferentes; em R3 com
-  `r3_cross_provider: true`, provedores também diferentes.
+- o combo existe em `combos`;
+- o runner resolvido (`combos.<nome>.runner`, senão `default_runner`) existe em
+  `cli_runners` e não está desligado em `runner_policy`.
+
+Que executor e revisor sejam modelos diferentes **não é verificável antes de
+executar**: dois combos distintos podem cair no mesmo modelo, e o kit não vê
+dentro do combo. A checagem acontece depois, comparando o campo `model` que cada
+resposta devolveu — e é por isso que registrá-lo corretamente não é burocracia.
 
 ### Resolver o CLI runner (camada separada do modelo)
 
@@ -298,12 +298,12 @@ commit. Incremente `orchestration.attempts.reworks`.
 Upgrade **não** é a primeira reação a uma falha. Só depois do budget de rework,
 ou quando a tarefa se revelou materialmente maior (ver gatilhos na guideline).
 
-Use `upgrade_alt1` e depois `upgrade_alt2`, respeitando `execution_policy`.
-Incremente `orchestration.attempts.upgrades`. Esgotado o budget:
+Não há slot de upgrade para acionar: o combo do papel é o que existe. Respeite
+`execution_policy` para rework e, esgotado o budget, marque
 `orchestration.state: blocked` e escale ao humano.
 
-Trocar `default` por `alt1`/`alt2` por indisponibilidade é **lateral**: não é
-falha de qualidade e não consome budget de rework.
+Indisponibilidade e cota são resolvidas pelo gateway, uma camada abaixo, e não
+consomem budget de rework aqui.
 
 ---
 

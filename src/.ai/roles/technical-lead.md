@@ -13,16 +13,11 @@ task. O `orchestrator` executa essa decisao, sem replanejar.
 - Quebrar demandas em tarefas pequenas e ordenadas por dependencia.
 - Definir entregaveis, criterios de aceite e testes esperados.
 - Classificar complexidade e risco separadamente e registrar dominios e impacto.
-- Classificar funcionalmente a demanda em `routing`: `work_type`, `categories`,
-  `technologies` e `required_capabilities`.
-- Resolver e persistir o roteamento por `.ai/model-routing.yaml`:
-  - executor: `default`, `alt1`, `alt2`, `upgrade_alt1`, `upgrade_alt2`, cada um
-    com o seu `effort`;
-  - tester e reviewer: ao menos o `default`, com effort;
-  - politica de teste, revisao, independencia e cross-provider.
-- Explicar cada escolha em `routing_rationale` para que a decisao seja auditavel.
-- Conferir a elegibilidade por `profile_by_variant[effort]`, nao pelo `profile`
-  plano: o mesmo modelo pode ser elegivel em `high` e inelegivel em `low`.
+- Resolver e persistir o roteamento por `.ai/model-routing.yaml`: o combo de
+  cada papel sai de `roles`, pelo nivel de risco, e o `effort` sai de `combos`.
+  Nao ha modelo a escolher -- quem escolhe e o gateway -- e por isso nao ha
+  escolha a justificar.
+- Registrar a politica de teste e revisao que o risco exige.
 - Criar ou atualizar task local e issue GitHub antes de encaminhar execucao.
 - Encaminhar execucao com caminho exato da task, cargo e modelo recomendado; nunca usar pedido generico.
 - Apontar bloqueios, riscos e decisoes que precisam do humano.

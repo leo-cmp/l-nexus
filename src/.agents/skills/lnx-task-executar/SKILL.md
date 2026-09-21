@@ -20,7 +20,6 @@ Depois de localizar a task (passo 1), verifique `model_plan.schema`:
   terminais visiveis, colete os resultados estruturados e aplique os gates de
   rework/upgrade la descritos.
 - **sem `schema`** (task no schema 1) → siga o fluxo abaixo, que continua valido.
-  Para adotar os slots, rode `l-nexus migrate-task <task> --to 2 --write` e
   complete o roteamento antes de executar.
 - **`needs_manual_routing: true`** → pare. A task veio de migracao e precisa de
   um humano para completar o roteamento e remover a marca.

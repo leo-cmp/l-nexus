@@ -36,49 +36,51 @@ function withProjectRouting(transform, assertions) {
   }
 }
 
-// Remove uma entrada do catalogo, simulando projeto atrasado em relacao ao kit.
-function withoutModel(source, key) {
-  return source.replace(
-    new RegExp(`\\n  ${key}:\\n(?:    .*\\n|\\n)*?(?=  [a-z0-9-]+:\\n|risk_domains:)`),
-    '\n',
-  );
+// Remove um combo do catalogo, simulando projeto atrasado em relacao ao kit.
+// Antes isto removia um modelo; a schema 3 nao tem modelos, e o combo e a
+// unidade equivalente -- o que o kit sabe e o projeto ainda nao.
+function withoutCombo(source, key) {
+  return source.replace(new RegExp(`\\n  ${key}: \\{[^}]*\\}`), '');
 }
 
 test('dry-run reports what would change and writes nothing', () => {
-  withProjectRouting((source) => withoutModel(source, 'tencent-hy3'), ({ run, read }) => {
+  withProjectRouting((source) => withoutCombo(source, '9r-tester-frontier'), ({ run, read }) => {
     const antes = read();
     const result = run();
     assert.equal(result.status, 0, result.stderr);
     assert.match(result.stdout, /Mudaria \(dry-run\)/);
-    assert.match(result.stdout, /\+ tencent-hy3/);
+    assert.match(result.stdout, /\+ 9r-tester-frontier/);
     assert.match(result.stdout, /Nada foi escrito/);
     assert.equal(read(), antes);
   });
 });
 
 test('--write brings the catalog up to date', () => {
-  withProjectRouting((source) => withoutModel(source, 'tencent-hy3'), ({ run, parsed }) => {
-    assert.equal(parsed().models['tencent-hy3'], undefined);
+  withProjectRouting((source) => withoutCombo(source, '9r-tester-frontier'), ({ run, parsed }) => {
+    assert.equal(parsed().combos['9r-tester-frontier'], undefined);
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
-    assert.ok(parsed().models['tencent-hy3'], 'o modelo do kit nao chegou ao projeto');
+    assert.ok(parsed().combos['9r-tester-frontier'], 'o combo do kit nao chegou ao projeto');
   });
 });
 
 test('what belongs to the project and to the machine survives the sync', () => {
   // E a razao de o arquivo inteiro ter sido congelado ate agora: para proteger
   // estas secoes, congelou-se tambem o catalogo, que devia andar.
-  withProjectRouting((source) => withoutModel(source, 'tencent-hy3')
-    .replace('  r2_review: required', '  r2_review: optional')
+  withProjectRouting((source) => withoutCombo(source, '9r-tester-frontier')
+    .replace('  r2_review: optional', '  r2_review: required')
     .replace('  project: []', '  project: [faturamento-interno]')
-    .replace('  claude:\n    enabled: false', '  claude:\n    enabled: true'),
+    // Acrescenta entrada propria em vez de mexer numa do kit: o que este teste
+    // afirma e que a secao do projeto sobrevive, e isso nao deve depender do
+    // texto de uma politica que o kit pode reescrever a qualquer momento.
+    .replace('runner_policy:\n', 'runner_policy:\n  runner-local:\n    enabled: false\n    conta: "decisao do projeto"\n'),
   ({ run, parsed }) => {
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
     const routing = parsed();
-    assert.equal(routing.project_policy.r2_review, 'optional');
+    assert.equal(routing.project_policy.r2_review, 'required');
     assert.deepEqual(routing.risk_domains.project, ['faturamento-interno']);
-    assert.equal(routing.runner_policy.claude.enabled, true);
+    assert.equal(routing.runner_policy['runner-local'].conta, 'decisao do projeto');
     assert.ok(routing.cli_runners.opencode, 'os runners da maquina sumiram');
     assert.ok(routing.terminal_runners, 'os terminais da maquina sumiram');
     assert.match(result.stdout, /Preservado: project_policy/);
@@ -89,10 +91,10 @@ test('the comments that justify a route travel with it', () => {
   // A justificativa de uma rota vale tanto quanto a rota: sem ela o proximo a
   // mexer no arquivo reescreve a regra sem saber por que ela existia.
   withProjectRouting(
-    (source) => withoutModel(source, 'tencent-hy3').replace(/# 1\. PAPEIS DISJUNTOS\./, '# (comentario perdido)'),
+    (source) => withoutCombo(source, '9r-tester-frontier').replace(/# Qual combo cada papel usa\./, '# (comentario perdido)'),
     ({ run, read }) => {
       run('--write');
-      assert.match(read(), /PAPEIS DISJUNTOS/);
+      assert.match(read(), /Qual combo cada papel usa/);
     },
   );
 });
@@ -111,7 +113,7 @@ test('a section the kit does not know is kept and announced', () => {
   // Configuracao local legitima nao e erro. Mas passar por cima dela em
   // silencio seria, entao ela e dita em voz alta.
   withProjectRouting(
-    (source) => withoutModel(source, 'tencent-hy3') + '\nintegracao_local:\n  chave: valor\n',
+    (source) => withoutCombo(source, '9r-tester-frontier') + '\nintegracao_local:\n  chave: valor\n',
     ({ run, parsed }) => {
       const result = run('--write');
       assert.equal(result.status, 0, result.stderr);
@@ -124,7 +126,7 @@ test('a section the kit does not know is kept and announced', () => {
 test('refuses to sync content onto a schema that cannot hold it', () => {
   // Migrar schema e outro trabalho, com outras regras. Sincronizar por cima
   // produziria um arquivo que nao valida, e o erro apareceria longe da causa.
-  withProjectRouting((source) => source.replace('schema_version: 2', 'schema_version: 1'), ({ run }) => {
+  withProjectRouting((source) => source.replace('schema_version: 3', 'schema_version: 2'), ({ run }) => {
     const result = run('--write');
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /migrate-routing/);
@@ -133,10 +135,10 @@ test('refuses to sync content onto a schema that cannot hold it', () => {
 
 test('the synced file still satisfies the shipped-routing rules', () => {
   // Sincronizar nao pode produzir um arquivo que o proprio validador recusa.
-  withProjectRouting((source) => withoutModel(source, 'tencent-hy3'), ({ run, routingPath }) => {
+  withProjectRouting((source) => withoutCombo(source, '9r-tester-frontier'), ({ run, routingPath }) => {
     run('--write');
     const validator = path.join(scriptsDirectory, 'validate-task-routing.mjs');
-    const task = path.join(scriptsDirectory, 'fixtures', 'tasks', 'e2e-r1-documentation.md');
+    const task = path.join(scriptsDirectory, 'fixtures', 'tasks', 'e2e-v3-r1.md');
     const result = spawnSync(process.execPath, [
       validator, task, '--routing', routingPath, '--final-commit', 'abc1234',
     ], { encoding: 'utf8' });
@@ -152,7 +154,7 @@ test('cli_runners merges: the kit updates what it knows and keeps what it does n
   // comportamento em que nada se perde e a correcao chega.
   withProjectRouting((source) => source
     // projeto atrasado: sem o runner novo do kit...
-    .replace(/\n  opencode-muse:\n(?:    .*\n|      .*\n|\n)*?(?=  [a-z0-9-]+:\n)/, '\n')
+    .replace(/\n  agy:\n(?:    .*\n|      .*\n|\n)*?(?=  [a-z0-9-]+:\n)/, '\n')
     // ...com uma declaracao velha no runner que ambos tem...
     .replace('  opencode:\n    binary: "opencode"', '  opencode:\n    binary: "opencode-antigo"')
     // ...e com um runner que so ele conhece, DENTRO de cli_runners: anexar no
@@ -162,7 +164,7 @@ test('cli_runners merges: the kit updates what it knows and keeps what it does n
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
     const runners = parsed().cli_runners;
-    assert.ok(runners['opencode-muse'], 'o runner que so o kit tinha nao chegou ao projeto');
+    assert.ok(runners.agy, 'o runner que so o kit tinha nao chegou ao projeto');
     assert.equal(runners.opencode.binary, 'opencode', 'a entrada desatualizada do projeto nao foi corrigida');
     assert.equal(runners['runner-caseiro'].binary, 'meu-script', 'o runner local foi apagado');
   });
@@ -204,16 +206,16 @@ test('a PRESERVED section the project never had is seeded from the kit', () => {
 // O outro lado da mesma regra, e o que impede a correcao de virar atropelo: se
 // a secao existe, ela e do projeto e nao se toca, nem quando discorda do kit.
 test('a PRESERVED section the project already has is never overwritten', () => {
+  // Diverge do kit trocando a secao inteira, e nao um trecho literal dela: um
+  // teste preso ao texto exato de uma politica quebra quando alguem muda essa
+  // politica, e o que ele quer afirmar nao tem nada a ver com o conteudo dela.
+  const divergente = 'runner_policy:\n  runner-do-projeto:\n    enabled: false\n    conta: "decisao local"\n';
   withProjectRouting(
-    (source) => source.replace(
-      '  claude:\n    enabled: false\n    conta: "API Anthropic do humano, cobrada por token"',
-      '  claude:\n    enabled: true\n    conta: "decisao do projeto"',
-    ),
+    (source) => source.replace(/\nrunner_policy:\n(?:  .*\n|    .*\n)*/, '\n' + divergente),
     ({ run, parsed }) => {
       const result = run('--write');
       assert.equal(result.status, 0, result.stderr);
-      assert.equal(parsed().runner_policy.claude.enabled, true);
-      assert.equal(parsed().runner_policy.claude.conta, 'decisao do projeto');
+      assert.deepEqual(parsed().runner_policy, { 'runner-do-projeto': { enabled: false, conta: 'decisao local' } });
       assert.doesNotMatch(result.stdout, /Semeado: .*runner_policy/);
     },
   );
