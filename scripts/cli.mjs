@@ -19,10 +19,6 @@ const commands = new Map([
     executable: process.execPath,
     prefix: [path.join(scriptDirectory, 'validate-task-routing.mjs')],
   }],
-  ['migrate-task', {
-    executable: process.execPath,
-    prefix: [path.join(scriptDirectory, 'migrate-task-routing.mjs')],
-  }],
   ['migrate-routing', {
     executable: process.execPath,
     prefix: [path.join(scriptDirectory, 'migrate-routing.mjs')],
@@ -40,8 +36,7 @@ Commands:
   install [target]
   update [target]
   validate-task <task-path> [--routing <path>] [--final-commit <sha>] [--write-plan-hash] [--allow-replan]
-  migrate-task <task-path> [--to 1|2] [--write]
-  migrate-routing <routing-path> [--write]
+  migrate-routing <routing-path> [--write]   # leva o roteamento para a schema 3
   sync-routing [<routing-path>] [--write]`;
 }
 

@@ -33,7 +33,6 @@ grep -q "l-nexus instalado com sucesso" "$TMP_DIR/update.log" ||
 
 "$CLI" --help > "$TMP_DIR/help.log"
 grep -q "validate-task" "$TMP_DIR/help.log" || fail "help omits validate-task"
-grep -q "migrate-task" "$TMP_DIR/help.log" || fail "help omits migrate-task"
 
 if "$CLI" unknown-command > "$TMP_DIR/unknown.log" 2>&1; then
   fail "unknown command returned success"
@@ -51,11 +50,6 @@ fi
 grep -q "Task routing validation failed" "$TMP_DIR/validate-error.log" ||
   fail "validate-task error output was not forwarded"
 
-"$CLI" migrate-task --help > "$TMP_DIR/migrate-help.log"
-grep -q "Migrates routing metadata" "$TMP_DIR/migrate-help.log" ||
-  fail "migrate-task was not dispatched"
-grep -q -- "--to 1|2" "$TMP_DIR/migrate-help.log" ||
-  fail "migrate-task help omits the schema target option"
 
 node -e '
   const packageJson = require(process.argv[1]);

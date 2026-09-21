@@ -1,133 +1,150 @@
 #!/usr/bin/env node
 
-// Upgrades a project-owned model-routing.yaml from schema 1 to schema 2.
+// Leva um model-routing.yaml de projeto para a schema 3.
 //
-// The routing file belongs to the project and is never overwritten by an
-// install, so a project that updates l-nexus keeps schema 1 while receiving
-// schema 2 task templates. This migration closes that gap by adding only the
-// fields schema 2 actually requires, preserving every local decision and
-// comment, and never inventing a policy the project did not choose.
+// As schemas anteriores traziam um catalogo de modelos com perfil, capacidade e
+// provedor, e rotas que escolhiam modelo slot a slot. A schema 3 nao tem nada
+// disso: o roteamento e por combo do gateway, e quem escolhe o modelo e o
+// gateway. Nao existe conversao automatica de 43 modelos para 6 combos, porque
+// os combos sao montados fora do kit -- entao esta migracao nao tenta adivinhar.
+//
+// O que ela faz e o unico caminho honesto: parte do catalogo do kit, que ja esta
+// na schema 3, e enxerta de volta o que pertence ao projeto e a maquina. O que
+// era escolha de modelo e descartado com aviso, porque virou escolha de combo e
+// so o humano sabe qual.
 
 import { readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
 import process from 'node:process';
-import { isMap, parseDocument } from 'yaml';
+import { fileURLToPath } from 'node:url';
+import { parseDocument } from 'yaml';
 
-const TEST_GATE_BY_LEVEL = { R1: 'optional', R2: 'project_policy', R3: 'required' };
-const EXECUTION_POLICY = {
-  max_same_executor_reworks: 1,
-  max_upgrades: 1,
-  max_total_execution_attempts: 3,
-};
+const aqui = path.dirname(fileURLToPath(import.meta.url));
+const CATALOGO_DO_KIT = path.join(aqui, '..', 'src', '.ai', 'model-routing.yaml');
+
+// Espelha sync-routing: estas secoes sao do projeto ou da maquina e atravessam a
+// migracao intactas. `cli_runners` e mistura -- o kit atualiza o que conhece e o
+// runner local do projeto continua existindo.
+const DO_PROJETO = ['project_policy', 'runner_policy', 'terminal_runners'];
+
+// Saiu da schema 3: as duas dependiam de dado de modelo que o catalogo nao tem
+// mais. Sao descartadas em voz alta, nunca em silencio.
+const CHAVES_APOSENTADAS = ['r3_cross_provider', 'unknown_model_identity'];
 
 function usage() {
   return `Usage:
-  migrate-routing.mjs <routing-path> [--write]
+  migrate-routing.mjs <routing-path> [--write] [--from <kit-routing>]
   l-nexus migrate-routing <routing-path> [--write]
 
-Upgrades .ai/model-routing.yaml from schema 1 to schema 2. Adds only what
-schema 2 requires and preserves every local model, policy and comment. The
-default is a dry-run that prints the migrated file without modifying it.`;
+Leva o roteamento do projeto para a schema 3, preservando o que e dele:
+${DO_PROJETO.join(', ')} e risk_domains.project. Sem --write, so relata.`;
 }
 
 function parseArguments(argv) {
   const args = [...argv];
   if (args[0] === 'migrate-routing') args.shift();
-  if (args.includes('--help') || args.includes('-h')) return { help: true };
-
-  let routingPath = null;
-  let write = false;
-  for (const value of args) {
-    if (value === '--write') write = true;
-    else if (value.startsWith('-')) throw new Error(`unknown option ${value}`);
-    else if (routingPath) throw new Error('expected exactly one routing path');
-    else routingPath = value;
+  const options = { write: false, from: CATALOGO_DO_KIT, routingPath: undefined, help: false };
+  while (args.length > 0) {
+    const value = args.shift();
+    if (value === '--help' || value === '-h') options.help = true;
+    else if (value === '--write') options.write = true;
+    else if (value === '--from') {
+      options.from = args.shift();
+      if (!options.from) throw new Error('--from: requires a path');
+    } else if (value.startsWith('--')) throw new Error(`unknown option: ${value}`);
+    else if (options.routingPath === undefined) options.routingPath = value;
+    else throw new Error(`unexpected argument: ${value}`);
   }
-  if (!routingPath) throw new Error('routing path is required');
-  return { routingPath, write };
+  if (!options.help && options.routingPath === undefined) throw new Error('cli.routingPath: is required');
+  return options;
 }
 
-export function migrateRoutingContents(contents, source = '<routing>') {
-  const document = parseDocument(contents, { prettyErrors: false });
-  if (document.errors.length > 0) {
-    throw new Error(`${source}: invalid YAML: ${document.errors.map((error) => error.message).join('; ')}`);
-  }
-  if (!isMap(document.contents)) throw new Error(`${source}: expected a YAML mapping`);
+function ehMapa(node) {
+  return node !== undefined && node !== null && typeof node.get === 'function';
+}
 
-  const version = document.get('schema_version');
-  if (version === 2) return { changed: false, contents, notes: [] };
-  if (version !== 1) throw new Error(`${source}: unsupported schema_version ${version}; expected 1 or 2`);
+export function migrateRoutingContents(projetoTexto, kitTexto) {
+  const projeto = parseDocument(projetoTexto);
+  const kit = parseDocument(kitTexto);
+  const antes = projeto.toJS() ?? {};
+  const linhas = [];
 
-  const notes = [];
-  document.set('schema_version', 2);
-
-  if (!document.hasIn(['project_policy', 'r2_test_gate'])) {
-    // Mirrors the review policy shape but starts permissive: turning a gate on
-    // is a policy decision the project has to make, not something a migration
-    // can decide for it.
-    document.setIn(['project_policy', 'r2_test_gate'], 'optional');
-    notes.push('project_policy.r2_test_gate: definido como optional; ajuste para required se o projeto exigir gate de teste em R2');
+  if (antes.schema_version === 3) {
+    return { changed: false, text: projetoTexto, summary: ['ja esta na schema 3'] };
   }
 
-  for (const [level, gate] of Object.entries(TEST_GATE_BY_LEVEL)) {
-    if (!document.hasIn(['routes', level])) continue;
-    if (!document.hasIn(['routes', level, 'test_gate'])) {
-      document.setIn(['routes', level, 'test_gate'], gate);
-    }
-    if (level === 'R1' || document.hasIn(['routes', level, 'tester_profile'])) continue;
-    // Conservative on purpose: reusing the executor floor never lowers a bar.
-    // A cheaper tester is a legitimate choice, but it is the project's to make.
-    const executorProfile = document.getIn(['routes', level, 'executor_profile']);
-    if (typeof executorProfile === 'string') {
-      document.setIn(['routes', level, 'tester_profile'], executorProfile);
-      notes.push(`routes.${level}.tester_profile: herdou ${executorProfile} do executor; um tester mais barato e valido, mas a escolha e do projeto`);
+  // Enxerta as secoes do projeto no catalogo do kit. O par inteiro viaja, com a
+  // chave e os comentarios: a justificativa de uma politica vale tanto quanto a
+  // politica, e sem ela o proximo a mexer reescreve a regra sem saber por que
+  // ela existia.
+  for (const chave of DO_PROJETO) {
+    const par = projeto.contents?.items?.find((item) => String(item.key) === chave);
+    if (par === undefined) { linhas.push(`${chave}: nao existia no projeto; fica o padrao do kit`); continue; }
+    const itens = kit.contents?.items;
+    const indice = itens.findIndex((item) => String(item.key) === chave);
+    if (indice === -1) itens.push(par); else itens[indice] = par;
+    linhas.push(`${chave}: preservado do projeto`);
+  }
+
+  for (const chave of CHAVES_APOSENTADAS) {
+    if (kit.getIn(['project_policy', chave]) !== undefined) {
+      kit.deleteIn(['project_policy', chave]);
+      linhas.push(`project_policy.${chave}: descartado; dependia de dado de modelo que a schema 3 nao tem`);
     }
   }
 
-  if (!document.has('execution_policy')) {
-    document.set('execution_policy', { ...EXECUTION_POLICY });
-    notes.push('execution_policy: orcamento padrao de rework e upgrade adicionado; revise os limites');
+  const dominiosDoProjeto = projeto.getIn(['risk_domains', 'project'], true);
+  if (dominiosDoProjeto !== undefined) {
+    kit.setIn(['risk_domains', 'project'], dominiosDoProjeto);
+    linhas.push('risk_domains.project: preservado do projeto');
   }
 
-  if (!document.has('work_routes')) {
-    notes.push('work_routes: ausente. E opcional, mas sem ela o Planner escolhe os slots sem recomendacao do projeto');
-  }
-  const runners = document.get('cli_runners');
-  if (isMap(runners) && runners.items.length > 0) {
-    notes.push('cli_runners: os campos argv, interactive, autonomy e effort nao foram adicionados porque dependem da CLI instalada; confirme com --help antes de declarar');
+  // Runner que so o projeto tem nao pode sumir numa migracao: pode ser a unica
+  // forma de aquela maquina falar com um modelo.
+  const runnersDoProjeto = projeto.get('cli_runners', true);
+  if (ehMapa(runnersDoProjeto)) {
+    for (const item of runnersDoProjeto.items ?? []) {
+      const nome = String(item.key);
+      if (kit.getIn(['cli_runners', nome]) === undefined) {
+        kit.setIn(['cli_runners', nome], item.value);
+        linhas.push(`cli_runners.${nome}: runner local mantido`);
+      }
+    }
   }
 
-  // Without this the serializer rewrites every `[a, b]` as `[ a, b ]`, burying
-  // the handful of real changes under cosmetic churn -- which defeats the whole
-  // point of the dry run being reviewable.
-  const migrated = document.toString({ lineWidth: 0, flowCollectionPadding: false });
-  return { changed: true, contents: migrated, notes };
+  const modelos = Object.keys(antes.models ?? {}).length;
+  if (modelos > 0) {
+    linhas.push(`models: ${modelos} entradas descartadas; a schema 3 roteia por combo, nao por modelo`);
+  }
+  if (antes.work_routes !== undefined) {
+    linhas.push('work_routes: descartado; revise `roles` e `combos` e aponte cada papel ao combo certo');
+  }
+
+  return { changed: true, text: kit.toString({ lineWidth: 0 }), summary: linhas };
 }
 
 function main() {
   try {
     const options = parseArguments(process.argv.slice(2));
-    if (options.help) {
-      console.log(usage());
+    if (options.help) { console.log(usage()); return; }
+    const resultado = migrateRoutingContents(
+      readFileSync(options.routingPath, 'utf8'),
+      readFileSync(options.from, 'utf8'),
+    );
+    if (!resultado.changed) {
+      console.log(`${options.routingPath} ${resultado.summary[0]}.`);
       return;
     }
-    const original = readFileSync(options.routingPath, 'utf8');
-    const result = migrateRoutingContents(original, options.routingPath);
-    if (!result.changed) {
-      console.log(`No routing migration needed: ${options.routingPath}`);
-      return;
-    }
+    console.log(options.write ? 'Migrado para a schema 3:' : 'Migraria (dry-run):');
+    for (const linha of resultado.summary) console.log(`  ${linha}`);
     if (options.write) {
-      writeFileSync(options.routingPath, result.contents, 'utf8');
-      console.log(`Migrated routing to schema 2: ${options.routingPath}`);
+      writeFileSync(options.routingPath, resultado.text, 'utf8');
+      console.log(`Escrito em ${options.routingPath}.`);
     } else {
-      process.stdout.write(result.contents);
-    }
-    if (result.notes.length > 0) {
-      console.error('\nRevise manualmente:');
-      for (const note of result.notes) console.error(`- ${note}`);
+      console.log('Nada foi escrito. Use --write para aplicar.');
     }
   } catch (error) {
-    console.error(`Routing migration failed: ${error.message}`);
+    console.error(`migrate-routing: ${error.message}`);
     console.error(usage());
     process.exitCode = 1;
   }

@@ -1,0 +1,76 @@
+schema_version: 3
+
+project_policy:
+  r2_review: optional
+  r2_test_gate: optional
+
+routes:
+  R1:
+    review: optional
+    test_gate: optional
+    independent_model: false
+  R2:
+    review: project_policy
+    test_gate: project_policy
+    independent_model: true
+  R3:
+    review: required
+    test_gate: required
+    independent_model: true
+
+risk_domains:
+  generic_r3: [ payments-money, auth-identity ]
+  project: []
+
+default_runner: runner-a
+
+combos:
+  combo-executor: { effort: default }
+  combo-executor-frontier: { effort: max }
+  # Sem variante `critical`: existe para exercitar o caminho em que R3 cai no
+  # combo padrao do papel por nao haver um critico declarado.
+  combo-tester: { effort: default }
+  combo-reviewer: { effort: high }
+  combo-reviewer-frontier: { effort: xhigh }
+
+roles:
+  executor:
+    default: combo-executor
+    critical: combo-executor-frontier
+  tester:
+    default: combo-tester
+  reviewer:
+    default: combo-reviewer
+    critical: combo-reviewer-frontier
+
+execution_policy:
+  max_same_executor_reworks: 1
+  max_upgrades: 1
+  max_total_execution_attempts: 3
+
+cli_runners:
+  runner-a:
+    binary: "runner-a"
+    argv: [ "run", "{prompt}" ]
+    prompt_delivery: argv
+    interactive:
+      supported: false
+      argv: []
+    autonomy:
+      supported: false
+      argv: []
+    effort:
+      supported: true
+      argv: [ "--effort", "{effort}" ]
+
+runner_policy: {}
+
+terminal_runners:
+  preference: [ tmux ]
+  fallback: inline
+  hold: auto
+  hold_seconds: 30
+  adapters:
+    custom:
+      binary: ""
+      argv: []
