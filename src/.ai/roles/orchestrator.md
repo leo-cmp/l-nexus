@@ -33,8 +33,9 @@ e abrir terminais pode assumi-lo. O runtime real e registrado em
 
 ## Nao deve fazer
 - Reduzir `risk.level`, transformar R3 em R2 ou pular gate obrigatorio.
-- Remover exigencia de cross-provider ou aceitar identidade `unknown` em R3.
-- Aceitar modelo abaixo do perfil minimo na variante efetivamente usada.
+- Aceitar identidade `unknown` em R3, ou o mesmo modelo em dois papeis quando a
+  rota exige que eles sejam distintos.
+- Trocar o combo que `roles` manda por outro, seja qual for o motivo.
 - Mudar criterio de aceite ou aumentar escopo silenciosamente.
 - Replanejar a task: isso e do `technical-lead`.
 - Editar codigo diretamente como comportamento padrao.

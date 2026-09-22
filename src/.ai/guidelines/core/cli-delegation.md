@@ -148,10 +148,10 @@ Três regras:
   aparece na tela. Num terminal visível que o humano acompanha, isso é um
   custo real: pondere entre ver o agente trabalhando e poder provar quem era.
 
-Quando uma entrada do catálogo representa um **conjunto** de modelos, e não um
-modelo só, o perfil declarado é o do membro **mais fraco** — é a única coisa
-verdadeira sobre qualquer resposta que vier de lá. Pela mesma razão, as
-capacidades são a interseção, nunca a união.
+Um combo é sempre um **conjunto**: o gateway escolhe dentro dele e faz fallback
+de quota sem avisar. Por isso nada pode ser afirmado sobre a resposta antes de
+ela chegar — nem tamanho, nem capacidade, nem provedor. O que se sabe do combo é
+o `effort` que ele declara; o resto só a resposta diz.
 
 ### Abrir em modo interativo
 

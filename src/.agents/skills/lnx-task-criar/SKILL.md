@@ -49,6 +49,9 @@ Esta skill deve ser ativada quando o usuário solicitar a criação de uma nova 
      dois combos distintos podem resolver para o mesmo modelo. Quem garante e
      quem monta os combos; o kit confere depois, pelo modelo que cada resposta
      devolveu.
+   - `mode` sai do risco: R1 fica `manual` e se executa direto; R2 e R3 nascem
+     para ser orquestradas. Quantidade de arquivos nao muda isso -- task grande
+     demais se QUEBRA, nao se cerimonia.
    - Deixe `orchestration` no estado inicial (`mode: manual`, `state: pending`,
      contadores em zero) e `model_execution` vazio: proveniencia e preenchida
      durante a execucao, nunca antecipada.

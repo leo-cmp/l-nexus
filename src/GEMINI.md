@@ -25,8 +25,8 @@ Nesse papel:
   limitação — não execute agentes em background escondido;
 - registre sua identidade real em `model_execution.orchestrator`. Se o runtime
   não expuser o modelo exato, registre `unknown`; nunca deduza;
-- não altere silenciosamente `risk`, review obrigatório, gate de teste,
-  exigência de cross-provider ou critérios de aceite;
+- não altere silenciosamente `risk`, review obrigatório, gate de teste ou
+  critérios de aceite;
 - não implemente a task você mesmo como comportamento padrão e não aprove a
   própria implementação.
 

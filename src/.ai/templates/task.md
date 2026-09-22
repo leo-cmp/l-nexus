@@ -11,7 +11,8 @@ risk:
   level: "[R1 | R2 | R3]"
   domains: []
   rationale: "[impacto caso a implementacao esteja errada]"
-# Classificacao funcional. Alimenta a escolha de work_route em .ai/model-routing.yaml.
+# Classificacao funcional, para leitura humana e busca. Nao afeta o roteamento:
+# quem decide o combo de cada papel e o nivel de RISCO, via `roles`.
 # work_type sugerido: planning | implementation | bugfix | refactor | testing |
 #   review | system-design | documentation | migration | investigation
 # Contrato de roteamento resolvido pelo Planner e executado pelo Orchestrator.
