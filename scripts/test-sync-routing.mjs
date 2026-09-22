@@ -73,7 +73,10 @@ test('what belongs to the project and to the machine survives the sync', () => {
     // Acrescenta entrada propria em vez de mexer numa do kit: o que este teste
     // afirma e que a secao do projeto sobrevive, e isso nao deve depender do
     // texto de uma politica que o kit pode reescrever a qualquer momento.
-    .replace('runner_policy:\n', 'runner_policy:\n  runner-local:\n    enabled: false\n    conta: "decisao do projeto"\n'),
+    .replace('runner_policy:\n', 'runner_policy:\n  runner-local:\n    enabled: false\n    conta: "decisao do projeto"\n')
+    // O kit publica um runner so. Quem representa a maquina neste cenario e o
+    // runner que o projeto declarou sozinho -- e e ele que precisa sobreviver.
+    .replace('cli_runners:\n', 'cli_runners:\n  runner-da-maquina:\n    binary: "cli-local"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n'),
   ({ run, parsed }) => {
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
@@ -81,7 +84,7 @@ test('what belongs to the project and to the machine survives the sync', () => {
     assert.equal(routing.project_policy.r2_review, 'required');
     assert.deepEqual(routing.risk_domains.project, ['faturamento-interno']);
     assert.equal(routing.runner_policy['runner-local'].conta, 'decisao do projeto');
-    assert.ok(routing.cli_runners.opencode, 'os runners da maquina sumiram');
+    assert.ok(routing.cli_runners['runner-da-maquina'], 'os runners da maquina sumiram');
     assert.ok(routing.terminal_runners, 'os terminais da maquina sumiram');
     assert.match(result.stdout, /Preservado: project_policy/);
   });
@@ -152,21 +155,26 @@ test('cli_runners merges: the kit updates what it knows and keeps what it does n
   // mantinha uma declaracao de esforco que o kit ja havia corrigido por ser
   // falsa. Sobrescrever inteiro apagaria runner local. Mesclar e o unico
   // comportamento em que nada se perde e a correcao chega.
+  //
+  // A poda deixou o kit com um runner so, e e justamente este
+  // comportamento que decide o que ela significa para quem ja estava instalado:
+  // MERGED so tira do caminho o que o kit publica. Runner local continua onde
+  // esta, com o que o projeto escreveu nele.
   withProjectRouting((source) => source
-    // projeto atrasado: sem o runner novo do kit...
-    .replace(/\n  agy:\n(?:    .*\n|      .*\n|\n)*?(?=  [a-z0-9-]+:\n)/, '\n')
-    // ...com uma declaracao velha no runner que ambos tem...
-    .replace('  opencode:\n    binary: "opencode"', '  opencode:\n    binary: "opencode-antigo"')
-    // ...e com um runner que so ele conhece, DENTRO de cli_runners: anexar no
-    // fim do arquivo o poria dentro de terminal_runners, que vem depois.
-    .replace('cli_runners:\n', 'cli_runners:\n  runner-caseiro:\n    binary: "meu-script"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n'),
+    // projeto atrasado: com uma declaracao velha no runner que ambos tem...
+    .replace('    binary: "claude"', '    binary: "claude-antigo"')
+    // ...e com dois runners que so ele conhece, DENTRO de cli_runners: anexar
+    // no fim do arquivo os poria dentro de terminal_runners, que vem depois.
+    // Um deles e um dos que a poda tirou do kit -- o caso real de quem atualiza.
+    .replace('cli_runners:\n', 'cli_runners:\n  runner-caseiro:\n    binary: "meu-script"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n  runner-podado:\n    binary: "cli-que-saiu-do-kit"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n'),
   ({ run, parsed }) => {
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
     const runners = parsed().cli_runners;
-    assert.ok(runners.agy, 'o runner que so o kit tinha nao chegou ao projeto');
-    assert.equal(runners.opencode.binary, 'opencode', 'a entrada desatualizada do projeto nao foi corrigida');
+    assert.equal(runners.claude.binary, 'claude', 'a entrada desatualizada do projeto nao foi corrigida');
     assert.equal(runners['runner-caseiro'].binary, 'meu-script', 'o runner local foi apagado');
+    assert.equal(runners['runner-podado'].binary, 'cli-que-saiu-do-kit',
+      'a poda do kit apagou um runner que o projeto ja tinha');
   });
 });
 

@@ -165,7 +165,7 @@ Use `.agents/scripts/lnx-run.sh`, que implementa `detect → open → execute`:
 
 .agents/scripts/lnx-run.sh start \
   --task TASK-142 --role executor --slot default --attempt 1 \
-  --model <chave-do-catalogo> --effort high \
+  --model <combo-do-plano> --effort high \
   --runner <runner> --runner-bin <binario> \
   --runner-arg --model --runner-arg '{model}' --runner-arg '{prompt}' \
   --prompt-file .lnx/runtime/TASK-142/prompt-executor-1.txt \

@@ -275,7 +275,7 @@ terminal visível** para que o humano acompanhe. Use o runner:
 ```bash
 .agents/scripts/lnx-run.sh start \
   --task <id> --role executor --slot default --attempt 1 \
-  --model <chave-do-catalogo> --effort high \
+  --model <combo-do-plano> --effort high \
   --runner <nome> --runner-bin <binario> \
   --runner-arg --model --runner-arg '{model}' --runner-arg '{prompt}' \
   --prompt-file <arquivo> --prompt-delivery argv \
@@ -317,7 +317,7 @@ model_execution:
     selection: default
     agent: <agente>
     provider: <provedor>
-    model: <chave-do-catalogo>
+    model: <combo-do-plano>
     effort: high
     runner: <nome do cli_runner>
     started_at: 2026-08-31 10:00
@@ -326,7 +326,7 @@ model_execution:
     - selection: default
       agent: <agente>
       provider: <provedor>
-      model: <chave-do-catalogo>
+      model: <combo-do-plano>
       effort: high
       runner: <nome>
       commit: abc1234
@@ -336,7 +336,7 @@ model_execution:
     - selection: default
       agent: <agente>
       provider: <provedor>
-      model: <chave-do-catalogo>
+      model: <combo-do-plano>
       effort: high
       runner: <nome>
       commit: abc1234

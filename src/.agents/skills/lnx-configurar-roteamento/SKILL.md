@@ -42,7 +42,12 @@ Para cada CLI selecionada, valide o template de execução não-bloqueante / bat
 ### 4. Geração e Gravação dos Artefatos
 Grave ou atualize os dois arquivos centrais do projeto:
 1. `.ai/model-routing.yaml`:
-   - Atualize `profiles`, `models`, `risk_domains` e a seção `cli_runners`.
+   - Atualize `risk_domains.project`, `runner_policy` e `cli_runners`. **Não**
+     mexa em `combos`, `roles`, `routes`, `execution_policy` nem
+     `default_runner`: esses são do kit e chegam por `sync-routing`; editá-los
+     no projeto cria divergência silenciosa a cada atualização.
+   - `profiles` e `models` não existem na schema 3. Quem escolhe modelo é o
+     gateway, e o que o projeto configura é qual CLI fala com ele.
 2. `.ai/guidelines/core/cli-delegation.md`:
    - Documente os runners ativos, sintaxe de invocação no terminal, regras para passar contexto enxuto e como registrar os logs de evidência na task pai.
 
