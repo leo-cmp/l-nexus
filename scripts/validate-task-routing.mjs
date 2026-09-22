@@ -166,7 +166,16 @@ function validatePlanHash(plan, field, errors, warnings) {
 const RUN_EVIDENCE_FIELDS = [
   // [campo no meta.json, campo na entrada da task, rotulo no erro]
   ['role', null, 'role'],
-  ['model', 'model', 'model'],
+  // `meta.json.model` e o eco de `--model`, que na schema 3 e o COMBO. Ele
+  // confere contra `combo`, nao contra `model`: o que o script registrou foi o
+  // pedido, e e com o pedido que ele pode ser confrontado.
+  //
+  // Enquanto isto comparava com `model`, o campo nao tinha valor possivel numa
+  // task com run_id -- o modelo real divergia do combo aqui, o combo era
+  // recusado como "nome de combo em vez do modelo que respondeu", e `unknown`
+  // nao fecha gate em R2/R3. Foi esse beco que produziu um nome inventado: era
+  // a unica coisa que ninguem conseguia provar errada de imediato.
+  ['model', 'combo', 'combo'],
   ['effort', 'effort', 'effort'],
   ['slot', 'selection', 'slot'],
   ['runner', 'runner', 'runner'],
