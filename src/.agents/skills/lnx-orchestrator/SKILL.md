@@ -127,12 +127,19 @@ não aplicou — esse campo é declaração do que foi pedido, e mentir nele faz
   --runner-arg <cada elemento de cli_runners.<nome>.argv> \
   --prompt-file <caminho-do-prompt> \
   --prompt-delivery <argv|file|stdin> \
+  --observe-bin .agents/scripts/lnx-observe-9router.sh --observe-arg '{run_dir}' \
   --cwd <raiz-do-projeto> \
   --terminal auto --terminal-preference "<preference>" \
   --fallback <block|inline> --hold auto
 ```
 
 Regras:
+- **o observador nao e opcional em R2/R3.** Sem `--observe-bin`, nada grava
+  `observed-model`, o campo `model` so pode ser `unknown`, e `unknown` nao fecha
+  gate onde os papeis precisam ser servidos por modelos distintos. Quem roteia
+  por 9router usa `lnx-observe-9router.sh`, que o kit ja traz; outro gateway
+  precisa do seu proprio script. Sem observador a task nao passa do gate, e isso
+  e o comportamento certo -- nao um obstaculo a contornar preenchendo o campo;
 - passe cada elemento de `argv` como um `--runner-arg` separado, preservando a
   ordem. Os placeholders `{prompt}`, `{model}` e `{effort}` são substituídos um
   a um, sem shell no meio;

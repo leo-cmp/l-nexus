@@ -468,9 +468,19 @@ nao te prende:
   deixar em branco nao e.
 
 Para que `unknown` deixe de ser necessario, o run precisa de um observador:
-`lnx-run.sh --observe-bin <script>`, cujo argv recebe `{run_dir}` e escreve em
+`lnx-run.sh --observe-bin <script> --observe-arg '{run_dir}'`, que escreve em
 `observed-model` o nome que a resposta trouxe. Sem ele, nenhuma versao do kit
 tem como saber quem atendeu, e task orquestrada em R2/R3 nao fecha.
+
+Para o 9router o kit ja traz `.agents/scripts/lnx-observe-9router.sh`: o gateway
+registra cada requisicao no proprio banco, e o script cruza esse registro com a
+janela do run, filtrando pelos modelos que o combo pedido pode servir -- sem o
+filtro, uma sessao paralela emprestaria o modelo dela a este run. Ele e
+best-effort: quando nao encontra evidencia, nao diz nada, e o campo fica
+`unknown`. **Silencio dele nunca vira palpite seu.**
+
+Outro gateway precisa do seu proprio script. O contrato e minimo: receber o
+`run_dir` e imprimir, na primeira linha, o nome do modelo que atendeu.
 
 ### `run_id`: o que sustenta o gate
 
