@@ -571,15 +571,12 @@ function validateRouting(routing, errors) {
       if (combo.runner !== undefined && !isObject(routing.cli_runners?.[combo.runner])) {
         addError(errors, `routing.combos.${name}.runner`, `must reference a configured cli_runners entry (${combo.runner})`);
       }
-      validateRunnerIsUsable(errors, routing, combo.runner ?? routing.default_runner,
-        `routing.combos.${name}.runner`);
     }
   }
 
   if (!isObject(routing.cli_runners?.[routing.default_runner])) {
     addError(errors, 'routing.default_runner', 'must reference a configured cli_runners entry');
   }
-  validateRunnerIsUsable(errors, routing, routing.default_runner, 'routing.default_runner');
 
   if (!isObject(routing.roles)) {
     addError(errors, 'routing.roles', 'must be a mapping');
@@ -599,25 +596,6 @@ function validateRouting(routing, errors) {
         }
       }
     }
-  }
-}
-
-// `runner_policy` era comentario: um runner marcado `enabled: false` -- porque
-// a conta e paga por token, porque a assinatura nao foi contratada -- seguia
-// alcancavel, e o validador aprovava o roteamento que apontava para ele sem
-// dizer nada. Desligar nao desligava. Agora desliga.
-//
-// Ausencia continua significando ligado, e de proposito: quem acrescentou um
-// runner a mao no proprio projeto sabe de que conta ele sai, e o kit nao tem
-// como descobrir isso. O que o kit publica, ele declara.
-function validateRunnerIsUsable(errors, routing, runner, field) {
-  if (typeof runner !== 'string') return;
-  const policy = routing.runner_policy?.[runner];
-  if (isObject(policy) && policy.enabled === false) {
-    const conta = typeof policy.conta === 'string' && policy.conta.trim() !== ''
-      ? `: ${policy.conta}` : '';
-    addError(errors, field,
-      `resolves to ${runner}, which runner_policy turned off${conta}`);
   }
 }
 

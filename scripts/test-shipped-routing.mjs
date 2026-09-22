@@ -124,10 +124,6 @@ test('todo combo resolve para um runner que o projeto pode usar', () => {
     const runner = combo?.runner ?? routing.default_runner;
     if (!routing.cli_runners?.[runner]) {
       problemas.push(`combos.${nome}: runner ${runner} nao existe em cli_runners`);
-      continue;
-    }
-    if (routing.runner_policy?.[runner]?.enabled === false) {
-      problemas.push(`combos.${nome}: runner ${runner} esta desligado por runner_policy`);
     }
   }
   assert.deepEqual(problemas, [], problemas.join('\n'));

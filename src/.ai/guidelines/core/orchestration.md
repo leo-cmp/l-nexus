@@ -76,7 +76,7 @@ compatível com o schema anterior.
 Ler o combo de cada papel no plano e confirmar:
 - o combo existe em `combos`;
 - o runner resolvido (`combos.<nome>.runner` ou `default_runner`) existe em
-  `cli_runners` e não está desligado em `runner_policy`;
+  `cli_runners`;
 - existe um adaptador de terminal disponível.
 
 ### EXECUTE
@@ -503,9 +503,8 @@ fabricado. A segunda parece pronta.
 ### O que dizer no aviso
 
 Qual task parou, em que papel, qual cota acabou e quando volta, o que já foi
-concluído, e as opções concretas — esperar o reset, ligar um runner em
-`runner_policy`, ou o humano escolher outro modelo e replanejar. **Replanejar é
-dele**, não seu.
+concluído, e as opções concretas — esperar o reset, ou o humano replanejar.
+**Replanejar é dele**, não seu.
 
 ### Prevenção, que vale mais que o procedimento
 

@@ -25,7 +25,7 @@ const CATALOGO_DO_KIT = path.join(aqui, '..', 'src', '.ai', 'model-routing.yaml'
 // Espelha sync-routing: estas secoes sao do projeto ou da maquina e atravessam a
 // migracao intactas. `cli_runners` e mistura -- o kit atualiza o que conhece e o
 // runner local do projeto continua existindo.
-const DO_PROJETO = ['project_policy', 'runner_policy', 'terminal_runners'];
+const DO_PROJETO = ['project_policy', 'terminal_runners'];
 
 // Saiu da schema 3: as duas dependiam de dado de modelo que o catalogo nao tem
 // mais. Sao descartadas em voz alta, nunca em silencio.
@@ -99,16 +99,18 @@ export function migrateRoutingContents(projetoTexto, kitTexto) {
     linhas.push('risk_domains.project: preservado do projeto');
   }
 
-  // Runner que so o projeto tem nao pode sumir numa migracao: pode ser a unica
-  // forma de aquela maquina falar com um modelo.
+  // `cli_runners` e do kit. Isto ja carregou runner local para dentro da
+  // migracao, para nao tirar da maquina a unica CLI que falava com um modelo --
+  // regra da schema 2, quando cada modelo tinha o seu runner. Na schema 3 quem
+  // fala com o gateway e o runner que o kit publica, e carregar o resto so
+  // adiaria a poda ate o proximo sync. O que sai daqui e dito em voz alta.
   const runnersDoProjeto = projeto.get('cli_runners', true);
   if (ehMapa(runnersDoProjeto)) {
-    for (const item of runnersDoProjeto.items ?? []) {
-      const nome = String(item.key);
-      if (kit.getIn(['cli_runners', nome]) === undefined) {
-        kit.setIn(['cli_runners', nome], item.value);
-        linhas.push(`cli_runners.${nome}: runner local mantido`);
-      }
+    const descartados = (runnersDoProjeto.items ?? [])
+      .map((item) => String(item.key))
+      .filter((nome) => kit.getIn(['cli_runners', nome]) === undefined);
+    if (descartados.length > 0) {
+      linhas.push(`cli_runners: ${descartados.join(', ')} descartado(s); o kit publica os runners`);
     }
   }
 
