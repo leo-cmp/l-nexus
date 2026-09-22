@@ -30,11 +30,6 @@ project_policy:
   r3_cross_provider: true
   unknown_model_identity: reject_for_r3
 
-runner_policy:
-  runner-caseiro:
-    enabled: false
-    conta: "conta do humano"
-
 profiles:
   economical: { rank: 1, description: x }
   balanced: { rank: 2, description: y }
@@ -98,17 +93,20 @@ test('o que o projeto decidiu atravessa a migracao intacto', () => {
   const routing = parse(migrado().text);
   assert.equal(routing.project_policy.r2_review, 'required');
   assert.equal(routing.project_policy.r2_test_gate, 'required');
-  assert.equal(routing.runner_policy['runner-caseiro'].enabled, false);
-  assert.equal(routing.runner_policy['runner-caseiro'].conta, 'conta do humano');
   assert.deepEqual(routing.risk_domains.project, ['faturamento-interno']);
   assert.deepEqual(routing.terminal_runners.preference, ['tmux']);
 });
 
-// Runner local pode ser a unica forma de aquela maquina falar com um modelo.
-test('runner que so o projeto tem e mantido', () => {
-  const routing = parse(migrado().text);
-  assert.equal(routing.cli_runners['runner-caseiro'].binary, 'meu-script');
-  assert.ok(routing.cli_runners.claude, 'os runners do kit nao chegaram');
+// Na schema 2 este teste afirmava o contrario: runner local podia ser a unica
+// forma de aquela maquina falar com um modelo, entao a migracao o carregava.
+// Com combo nao ha modelo a alcancar -- quem fala com o gateway e o runner que o
+// kit publica, e carregar o resto so adiaria a poda ate o proximo sync.
+test('runner que so o projeto tem e descartado, em voz alta', () => {
+  const { text, summary } = migrado();
+  const routing = parse(text);
+  assert.deepEqual(Object.keys(routing.cli_runners), ['claude']);
+  assert.ok(summary.some((linha) => linha.includes('runner-caseiro')),
+    `a migracao descartou o runner local calada: ${summary.join(' | ')}`);
 });
 
 // As duas politicas dependiam de perfil e provedor, que sairam do catalogo.
@@ -149,28 +147,6 @@ test('a CLI so escreve com --write, e o dry-run nao toca no arquivo', () => {
     const escrita = spawnSync(process.execPath, [migrator, routingPath, '--write'], { encoding: 'utf8' });
     assert.equal(escrita.status, 0, escrita.stderr);
     assert.equal(parse(readFileSync(routingPath, 'utf8')).schema_version, 3);
-  } finally {
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-// Desligar o runner que o roteamento alcanca passou a ser recusa, nao aviso: na
-// schema 2 havia varios runners e desligar um deixava caminho; com combo, o
-// roteamento inteiro vai para `default_runner`, e desliga-lo nao deixa nenhum.
-// Migrar um projeto nessa situacao tem que dizer isso em voz alta.
-test('o arquivo migrado denuncia um default_runner que o projeto desligou', () => {
-  const fonte = PROJETO_V2.replace('  runner-caseiro:\n    enabled: false', '  claude:\n    enabled: false');
-  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-mig-'));
-  try {
-    const routingPath = path.join(directory, 'model-routing.yaml');
-    writeFileSync(routingPath, migrado(fonte).text);
-    const result = spawnSync(process.execPath, [
-      path.join(scriptsDirectory, 'validate-task-routing.mjs'),
-      path.join(scriptsDirectory, 'fixtures', 'tasks', 'e2e-v3-r1.md'),
-      '--routing', routingPath, '--final-commit', 'abc1234',
-    ], { encoding: 'utf8' });
-    assert.notEqual(result.status, 0);
-    assert.match(result.stderr, /routing\.default_runner: resolves to claude, which runner_policy turned off/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

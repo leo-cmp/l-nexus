@@ -204,8 +204,8 @@ serve. Por isso o runner é **escolha direta**, e não algo deduzido do modelo:
 
 1. Se o combo declarar `runner`, use-o.
 2. Senão, use `default_runner`.
-3. Se o runner resolvido estiver desligado em `runner_policy`, **bloqueie e
-   avise** — não troque por outro por conta própria.
+3. Se o runner resolvido não existir em `cli_runners`, **bloqueie e avise** —
+   não troque por outro por conta própria.
 
 ### Effort
 

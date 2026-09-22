@@ -12,8 +12,8 @@
 // diferentes. `models` e do mundo: modelo novo sai, modelo velho e aposentado.
 // `work_routes`, `profiles`, `routes` e `execution_policy` sao do kit. Ja
 // `project_policy` e `risk_domains.project` sao decisao do projeto, e
-// `cli_runners`, `terminal_runners` e `runner_policy` descrevem a MAQUINA --
-// que CLI esta instalada, qual terminal existe, de quem e a conta que paga.
+// `terminal_runners` descreve a MAQUINA -- qual emulador existe para abrir uma
+// janela visivel.
 //
 // Para proteger essas duas ultimas categorias, congelou-se o arquivo inteiro.
 // Este comando troca as duas primeiras e nao encosta nas outras duas.
@@ -32,21 +32,24 @@ const SHIPPED_ROUTING = path.join(scriptDirectory, '..', 'src', '.ai', 'model-ro
 // `combos`, `roles` e `default_runner` sao do kit e sobrescrevem o projeto: o
 // esforco de cada combo e decisao unica, tomada no kit e propagada por versao.
 // Editar no projeto seria criar divergencia silenciosa entre os dois.
-export const SYNCED = ['schema_version', 'routes', 'execution_policy', 'combos', 'roles', 'default_runner'];
+// `cli_runners` entrou aqui quando a lista de runners encolheu para um. Ele ja
+// foi MERGED -- entrada do kit atualizada, entrada local intacta -- e essa
+// terceira categoria existia para nao apagar um runner que so a maquina tinha.
+//
+// O merge se voltou contra o proprio objetivo. Quando o kit podou cinco runners
+// que ninguem alcanca mais, preservar manteve os cinco exatamente onde eles
+// atrapalham: no arquivo do projeto. A poda nunca chegava, e a unica instalacao
+// real seguia com seis entradas para uma decisao que a schema 3 apagou.
+//
+// Runner e conhecimento do kit: quais existem, como sao invocados, se aplicam
+// effort. O kit manda, o projeto recebe, e o que ele podar some de verdade.
+export const SYNCED = [
+  'schema_version', 'routes', 'execution_policy', 'combos', 'roles',
+  'default_runner', 'cli_runners',
+];
 
 // O que e do projeto e da maquina. Nunca tocado.
-export const PRESERVED = ['project_policy', 'runner_policy', 'terminal_runners'];
-
-// cli_runners nao cabe em nenhuma das duas categorias, e tratar como uma delas
-// quebra de um jeito ou de outro. QUAIS binarios existem e da maquina; o argv, o
-// prompt_delivery e o mapping de esforco sao conhecimento do KIT. Preservar
-// inteiro deixou um projeto real com rotas apontando para pools sem os runners
-// que elas precisam, e mantendo uma declaracao de esforco que o kit ja tinha
-// corrigido por ser falsa. Sobrescrever inteiro apagaria runner local.
-//
-// Entao: entrada que o kit conhece e atualizada, entrada que so o projeto tem
-// fica intacta. Nada se perde e a correcao chega.
-export const MERGED = ['cli_runners'];
+export const PRESERVED = ['project_policy', 'terminal_runners'];
 
 // risk_domains tem os dois donos na mesma secao: a lista generica e do kit, a
 // do projeto e do projeto. E a unica que precisa ser costurada chave a chave.
@@ -60,7 +63,6 @@ function usage() {
 Propaga catalogo e rotas do kit para o roteamento de um projeto.
 
 Sincroniza : ${SYNCED.join(', ')}, risk_domains.${RISK_DOMAINS_FROM_KIT.join('/')}
-Mescla     : ${MERGED.join(', ')} -- entrada do kit atualiza, entrada local fica
 Preserva   : ${PRESERVED.join(', ')}, risk_domains.project
 
 O padrao e dry-run: mostra o que mudaria e nao escreve nada. Use --write para
@@ -192,22 +194,13 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
     replacePair(projeto, kit, chave);
   }
 
-  for (const chave of MERGED) {
-    const doKit = kit.get(chave, true);
-    if (doKit === undefined) continue;
-    if (!projeto.has(chave)) { replacePair(projeto, kit, chave); continue; }
-    for (const item of doKit.items ?? []) {
-      projeto.setIn([chave, String(item.key)], item.value);
-    }
-  }
-
   // PRESERVED protege o que o projeto decidiu; nao pode significar tambem "nao
   // cria o que falta". Projeto instalado antes de o campo existir ficava sem ele
   // PARA SEMPRE, e calado: o resumo so lista como preservado aquilo que ja
-  // estava la, entao a ausencia era invisivel dos dois lados. O caso caro e
-  // `runner_policy` -- sem ela os runners pagos ficam LIGADOS por omissao, o
-  // oposto exato do padrao que o kit escolheu. Semear nao briga com preservar:
-  // preservar so tem sentido quando ha o que preservar.
+  // estava la, entao a ausencia era invisivel dos dois lados. Descoberto com
+  // `runner_policy`, que ja nao existe; vale igual para `terminal_runners`, sem
+  // o qual o Orchestrator nao sabe como abrir uma janela. Semear nao briga com
+  // preservar: preservar so tem sentido quando ha o que preservar.
   const semeadas = [];
   for (const chave of PRESERVED) {
     if (projeto.has(chave)) continue;
@@ -232,15 +225,12 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
   const linhas = [];
   describeMapping('combos', antes.combos, depois.combos, linhas);
   describeMapping('roles', antes.roles, depois.roles, linhas);
+  describeMapping('cli_runners', antes.cli_runners, depois.cli_runners, linhas);
   for (const chave of ['schema_version', 'routes', 'execution_policy', 'default_runner']) {
     if (!same(antes[chave], depois[chave])) linhas.push(`${chave}: atualizado`);
   }
   if (!same(antes.risk_domains?.generic_r3, depois.risk_domains?.generic_r3)) {
     linhas.push('risk_domains.generic_r3: atualizado');
-  }
-
-  for (const chave of MERGED) {
-    describeMapping(`${chave} (mesclado)`, antes[chave], depois[chave], linhas);
   }
 
   for (const chave of semeadas) linhas.push(`${chave}: semeado (o projeto nao tinha a secao)`);
@@ -251,7 +241,7 @@ export function syncRouting({ routingPath, from = SHIPPED_ROUTING }) {
   // ninguem descobrir depois que o comando passou por cima de algo.
   const desconhecidas = Object.keys(antes).filter(
     (chave) => !SYNCED.includes(chave) && !PRESERVED.includes(chave)
-      && !MERGED.includes(chave) && chave !== 'risk_domains',
+      && chave !== 'risk_domains',
   );
 
   return {

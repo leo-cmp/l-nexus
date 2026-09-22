@@ -16,8 +16,8 @@ e abrir terminais pode assumi-lo. O runtime real e registrado em
 - Ler o routing persistido: o combo de cada papel e o effort ja estao no plano,
   entao nao ha escolha a refazer. Indisponibilidade e cota sao tratadas pelo
   gateway, uma camada abaixo.
-- Confirmar que o combo existe em `combos` e que o runner resolvido nao esta
-  desligado em `runner_policy`. Se estiver, bloquear e avisar.
+- Confirmar que o combo existe em `combos` e que o runner resolvido existe em
+  `cli_runners`. Se nao existir, bloquear e avisar -- nao trocar por outro.
 - Delegar executor, tester e reviewer em terminais visiveis ao usuario, um por
   papel por tentativa, conforme `.ai/guidelines/core/orchestration.md`.
 - Coletar resultado pelo diretorio de execucao (`status`, `exit-code`,

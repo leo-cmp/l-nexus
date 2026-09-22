@@ -64,10 +64,11 @@ description: Atualiza o pacote l-nexus para a versao mais recente via npx update
    npx @leo-cmp/l-nexus sync-routing .ai/model-routing.yaml
    ```
 
-   Mostre o que mudaria (modelos que entram, saem, mudam e quais secoes sao
-   atualizadas). Deixe claro que **nao** encosta em `project_policy`,
-   `risk_domains.project`, `cli_runners`, `terminal_runners` e `runner_policy`:
-   essas decisoes pertencem ao projeto e a maquina.
+   Mostre o que mudaria (runners e combos que entram, saem ou mudam, e quais
+   secoes sao atualizadas). Deixe claro que **nao** encosta em `project_policy`,
+   `risk_domains.project` e `terminal_runners`: essas decisoes pertencem ao
+   projeto e a maquina. `cli_runners` **e** atualizado -- runner e conhecimento
+   do kit, e o que ele podar sai do projeto no sync.
 
    Se o usuario concordar, aplique com `--write`:
    ```bash

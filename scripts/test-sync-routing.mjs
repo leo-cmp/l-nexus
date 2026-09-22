@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import test from 'node:test';
 import { parse } from 'yaml';
-import { MERGED, PRESERVED, SYNCED } from './sync-routing.mjs';
+import { PRESERVED, SYNCED } from './sync-routing.mjs';
 
 const scriptsDirectory = path.dirname(fileURLToPath(import.meta.url));
 const command = path.join(scriptsDirectory, 'sync-routing.mjs');
@@ -73,19 +73,17 @@ test('what belongs to the project and to the machine survives the sync', () => {
     // Acrescenta entrada propria em vez de mexer numa do kit: o que este teste
     // afirma e que a secao do projeto sobrevive, e isso nao deve depender do
     // texto de uma politica que o kit pode reescrever a qualquer momento.
-    .replace('runner_policy:\n', 'runner_policy:\n  runner-local:\n    enabled: false\n    conta: "decisao do projeto"\n')
-    // O kit publica um runner so. Quem representa a maquina neste cenario e o
-    // runner que o projeto declarou sozinho -- e e ele que precisa sobreviver.
-    .replace('cli_runners:\n', 'cli_runners:\n  runner-da-maquina:\n    binary: "cli-local"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n'),
+    // O que resta da maquina e o terminal: qual emulador existe para abrir uma
+    // janela visivel. Runner saiu desta categoria -- e do kit.
+    .replace('  fallback: inline', '  fallback: block'),
   ({ run, parsed }) => {
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
     const routing = parsed();
     assert.equal(routing.project_policy.r2_review, 'required');
     assert.deepEqual(routing.risk_domains.project, ['faturamento-interno']);
-    assert.equal(routing.runner_policy['runner-local'].conta, 'decisao do projeto');
-    assert.ok(routing.cli_runners['runner-da-maquina'], 'os runners da maquina sumiram');
-    assert.ok(routing.terminal_runners, 'os terminais da maquina sumiram');
+    assert.equal(routing.terminal_runners.fallback, 'block', 'a decisao de terminal foi atropelada');
+    assert.ok(routing.terminal_runners.preference, 'os terminais da maquina sumiram');
     assert.match(result.stdout, /Preservado: project_policy/);
   });
 });
@@ -149,38 +147,33 @@ test('the synced file still satisfies the shipped-routing rules', () => {
   });
 });
 
-test('cli_runners merges: the kit updates what it knows and keeps what it does not', () => {
-  // Descoberto na primeira propagacao real. Preservar cli_runners inteiro
-  // deixava o projeto com rotas apontando para runners que ele nao tinha, e
-  // mantinha uma declaracao de esforco que o kit ja havia corrigido por ser
-  // falsa. Sobrescrever inteiro apagaria runner local. Mesclar e o unico
-  // comportamento em que nada se perde e a correcao chega.
-  //
-  // A poda deixou o kit com um runner so, e e justamente este
-  // comportamento que decide o que ela significa para quem ja estava instalado:
-  // MERGED so tira do caminho o que o kit publica. Runner local continua onde
-  // esta, com o que o projeto escreveu nele.
+test('cli_runners e do kit: o que ele podou some do projeto', () => {
+  // Este teste ja afirmou o contrario. `cli_runners` era MERGED para nao apagar
+  // runner que so a maquina tinha -- e quando o kit podou cinco runners que
+  // ninguem mais alcanca, a preservacao manteve os cinco onde eles atrapalham:
+  // no arquivo do projeto. A unica instalacao real seguia com seis entradas para
+  // uma decisao que a schema 3 tinha apagado. O merge protegia o lixo.
   withProjectRouting((source) => source
-    // projeto atrasado: com uma declaracao velha no runner que ambos tem...
+    // projeto atrasado: com uma declaracao velha no runner que o kit publica...
     .replace('    binary: "claude"', '    binary: "claude-antigo"')
-    // ...e com dois runners que so ele conhece, DENTRO de cli_runners: anexar
-    // no fim do arquivo os poria dentro de terminal_runners, que vem depois.
-    // Um deles e um dos que a poda tirou do kit -- o caso real de quem atualiza.
+    // ...e com dois que so ele tem, DENTRO de cli_runners: anexar no fim do
+    // arquivo os poria dentro de terminal_runners, que vem depois.
     .replace('cli_runners:\n', 'cli_runners:\n  runner-caseiro:\n    binary: "meu-script"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n  runner-podado:\n    binary: "cli-que-saiu-do-kit"\n    argv: ["{prompt}"]\n    prompt_delivery: argv\n'),
   ({ run, parsed }) => {
     const result = run('--write');
     assert.equal(result.status, 0, result.stderr);
     const runners = parsed().cli_runners;
     assert.equal(runners.claude.binary, 'claude', 'a entrada desatualizada do projeto nao foi corrigida');
-    assert.equal(runners['runner-caseiro'].binary, 'meu-script', 'o runner local foi apagado');
-    assert.equal(runners['runner-podado'].binary, 'cli-que-saiu-do-kit',
-      'a poda do kit apagou um runner que o projeto ja tinha');
+    assert.deepEqual(Object.keys(runners), ['claude'], 'a poda do kit nao chegou ao projeto');
+    // Apagar calado seria pior que preservar: o humano precisa ver o que saiu.
+    assert.match(result.stdout, /runner-caseiro/);
+    assert.match(result.stdout, /runner-podado/);
   });
 });
 
 // Remove uma secao inteira de topo, simulando projeto instalado ANTES de o kit
-// passar a ter esse campo. Nao e hipotese: o clp foi instalado antes de
-// `runner_policy` existir e chegou na 0.12.4 sem nenhuma politica de runner.
+// passar a ter esse campo. Nao e hipotese: o clp foi instalado antes de haver
+// politica de runner e chegou na 0.12.4 sem a secao que ela ocupava.
 function withoutSection(source, key) {
   return source.replace(
     new RegExp(`\\n${key}:\\n(?:  .*\\n|    .*\\n|\\n(?=  ))*`),
@@ -190,11 +183,11 @@ function withoutSection(source, key) {
 
 // PRESERVED protegia o que existe e nao criava o que falta, entao um projeto
 // antigo ficava permanentemente sem a secao -- e em silencio, porque o resumo so
-// lista como preservado aquilo que ja estava la. O caso caro e este: sem
-// `runner_policy` os runners pagos ficam LIGADOS por omissao, que e o oposto
-// exato do padrao que o kit escolheu, e 28 slots das rotas passam a resolver
-// para dois runners cada. Semear nao briga com preservar: preservar so tem
-// sentido quando ha o que preservar.
+// lista como preservado aquilo que ja estava la. Descoberto com uma secao que
+// hoje nem existe mais; vale igual para `terminal_runners`, sem a qual o
+// Orchestrator nao sabe como abrir uma janela visivel e cai no fallback sem
+// nunca dizer por que. Semear nao briga com preservar: preservar so tem sentido
+// quando ha o que preservar.
 test('a PRESERVED section the project never had is seeded from the kit', () => {
   const kit = parse(readFileSync(shipped, 'utf8'));
   for (const section of PRESERVED) {
@@ -217,14 +210,14 @@ test('a PRESERVED section the project already has is never overwritten', () => {
   // Diverge do kit trocando a secao inteira, e nao um trecho literal dela: um
   // teste preso ao texto exato de uma politica quebra quando alguem muda essa
   // politica, e o que ele quer afirmar nao tem nada a ver com o conteudo dela.
-  const divergente = 'runner_policy:\n  runner-do-projeto:\n    enabled: false\n    conta: "decisao local"\n';
+  const divergente = 'project_policy:\n  r2_review: required\n  r2_test_gate: required\n';
   withProjectRouting(
-    (source) => source.replace(/\nrunner_policy:\n(?:  .*\n|    .*\n)*/, '\n' + divergente),
+    (source) => source.replace(/\nproject_policy:\n(?:  .*\n|    .*\n)*/, '\n' + divergente),
     ({ run, parsed }) => {
       const result = run('--write');
       assert.equal(result.status, 0, result.stderr);
-      assert.deepEqual(parsed().runner_policy, { 'runner-do-projeto': { enabled: false, conta: 'decisao local' } });
-      assert.doesNotMatch(result.stdout, /Semeado: .*runner_policy/);
+      assert.deepEqual(parsed().project_policy, { r2_review: 'required', r2_test_gate: 'required' });
+      assert.doesNotMatch(result.stdout, /Semeado: .*project_policy/);
     },
   );
 });
@@ -235,7 +228,7 @@ test('a PRESERVED section the project already has is never overwritten', () => {
 // alguem adicionar uma secao sem decidir se ela sincroniza, mescla ou preserva.
 test('every top-level section of the shipped catalog has an owner', () => {
   const shippedKeys = Object.keys(parse(readFileSync(shipped, 'utf8')));
-  const classified = new Set([...SYNCED, ...MERGED, ...PRESERVED, 'risk_domains']);
+  const classified = new Set([...SYNCED, ...PRESERVED, 'risk_domains']);
   const orphans = shippedKeys.filter((key) => !classified.has(key));
   assert.deepEqual(orphans, [], `unclassified in sync-routing.mjs: ${orphans.join(', ')}`);
 });

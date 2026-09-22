@@ -55,7 +55,7 @@ Para executor, tester e reviewer, leia o combo do plano e confirme:
 
 - o combo existe em `combos`;
 - o runner resolvido (`combos.<nome>.runner`, senão `default_runner`) existe em
-  `cli_runners` e não está desligado em `runner_policy`.
+  `cli_runners`.
 
 Que executor e revisor sejam modelos diferentes **não é verificável antes de
 executar**: dois combos distintos podem cair no mesmo modelo, e o kit não vê
@@ -73,11 +73,9 @@ Se você se pegar montando uma lista de candidatos, comparando CLIs ou pensando
 em perguntar ao humano qual usar, **pare**: você está resolvendo um problema que
 a schema 3 apagou, e a resposta já está escrita em duas linhas do catálogo.
 
-Só há dois motivos para bloquear aqui, e nenhum deles é dúvida:
-
-- o runner resolvido não existe em `cli_runners`;
-- ele está `enabled: false` em `runner_policy` — decisão de orçamento do humano,
-  que você não contorna. O validador também recusa esse roteamento.
+Só há um motivo para bloquear aqui, e ele não é dúvida: o runner resolvido não
+existe em `cli_runners`. Nesse caso pare e avise — **não** troque por outro nem
+saia procurando alternativa.
 
 ### Effort
 

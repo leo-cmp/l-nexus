@@ -86,8 +86,10 @@ execution_policy:
 #    resolve isso e o fallback do gateway, uma camada abaixo -- e por isso os
 #    slots alternativos deixaram de existir aqui.
 #
-# 3. O CARO FICA DESLIGADO POR PADRAO. Runner que cobra direto da conta do
-#    humano so entra por decisao consciente, via `runner_policy`.
+# 3. O CARO FICA DESLIGADO POR PADRAO. Era regra de quando havia varias CLIs
+#    aqui e uma delas cobrava por token da conta do humano. Com um runner so,
+#    apontado para o gateway, nao ha caminho caro a desligar: o que cada combo
+#    custa e decisao de quem monta o combo, do outro lado.
 
 risk_domains:
   generic_r3:
@@ -111,25 +113,10 @@ risk_domains:
 # registra o nivel nas requisicoes dele, enquanto as do opencode chegam sempre
 # no mesmo nivel, independente do que foi pedido.
 #
-# As outras CLIs sairam do kit junto com a poda. Elas nao foram apagadas de quem
-# ja as tinha: `cli_runners` e MERGED no sync, entao runner local continua no
-# arquivo do projeto. O que mudou e que instalacao nova nao recebe um cardapio de
-# seis opcoes para uma decisao que nao existe -- foi esse cardapio que fez um
-# Orchestrator parar no meio de uma task e perguntar ao humano qual CLI usar.
-runner_policy:
-  claude:
-    # Ligado: a assinatura esta ativa. Apontado para um gateway local por
-    # settings.local.json ele nem consome a API da Anthropic: gasta a cota do
-    # gateway. Reveja se a assinatura nao for renovada, que e o unico motivo
-    # para desligar.
-    #
-    # Isto e porta, nao aviso: `enabled: false` aqui faz o validador RECUSAR o
-    # roteamento que aponta para este runner, em vez de deixar passar calado.
-    # Runner que so o projeto declarou, sem entrada aqui, conta como ligado --
-    # quem o acrescentou a mao sabe o que esta pagando.
-    enabled: true
-    conta: "Assinatura Claude ativa; por gateway local nao toca a API paga"
-
+# Houve aqui um `runner_policy`, que marcava runner ligado ou desligado por
+# causa da conta que o pagava. Ela existia para escolher entre varios; com um
+# runner so, a unica coisa que ela podia dizer era "sim", e uma porta contra
+# desligar o proprio unico runner nao protege de nada. Saiu junto com a escolha.
 cli_runners:
   # Interface verificada contra o binario instalado com `--help`. Ao trocar de
   # CLI ou de versao, confirme antes de editar: um template errado trava a
