@@ -321,16 +321,16 @@ function findPlanWitness(relativePath, cwd) {
       // Versao antiga sem front matter legivel nao serve de testemunho.
       continue;
     }
-    const execution = committed.model_execution;
-    if (!isObject(execution) || !isObject(execution.executor)) return { commit, plan: committed.model_plan };
+    if (!hasStartedExecution(committed.model_execution?.executor)) {
+      return { commit, plan: committed.model_plan };
+    }
   }
   return null;
 }
 
 function validatePlanWitness(task, taskPath, field, errors, warnings, { allowReplan = false } = {}) {
   if (!isObject(task.model_plan)) return;
-  const execution = task.model_execution;
-  if (!isObject(execution) || !isObject(execution.executor)) return;
+  if (!hasStartedExecution(task.model_execution?.executor)) return;
 
   const cwd = path.dirname(path.resolve(taskPath));
   let relativePath;
@@ -407,6 +407,15 @@ function writePlanHash(taskPath) {
 
 function valueIsKnown(value) {
   return typeof value === 'string' && value.trim() !== '' && value.trim().toLowerCase() !== 'unknown';
+}
+
+// O template entrega `model_execution.executor` ja montado, com os campos
+// vazios, porque o esqueleto e o que ensina ao agente quais campos existem.
+// Presenca do mapping, entao, nao prova nada: o que separa task pendente de
+// task executada e haver ALGUM valor de verdade ali dentro. Numero nao conta --
+// `reasoning_tokens: 0` vem do proprio esqueleto.
+function hasStartedExecution(record) {
+  return isObject(record) && Object.values(record).some(valueIsKnown);
 }
 
 function validateIdentity(errors, value, field, { requireKnown = false } = {}) {
@@ -725,10 +734,22 @@ function validateTask(task, routing, finalCommit, errors, warnings, context) {
 
   validatePlanHash(plan, 'task.model_plan', errors, warnings);
 
-  const execution = task.model_execution;
-  if (!isObject(execution)) {
+  // Proveniencia so vira exigencia depois que alguem executou. Enquanto o
+  // esqueleto do template esta vazio, a task e um plano -- cobrar dela o modelo
+  // que atendeu seria cobrar prova de um fato que ainda nao aconteceu.
+  const execution = isObject(task.model_execution) ? task.model_execution : {};
+  if (!hasStartedExecution(execution.executor)) {
     if (task.orchestration?.state === 'done') {
-      addError(errors, 'task.model_execution', 'must be a mapping once the task is done');
+      addError(errors, 'task.model_execution.executor',
+        'must record who executed once the task is done');
+    }
+    // Teste ou revisao sem execucao e contradicao, nao task pendente: alguem
+    // registrou o veredito de um trabalho que o arquivo diz nao ter comecado.
+    for (const campo of ['tests', 'reviews']) {
+      if ((execution[campo] ?? []).some(hasStartedExecution)) {
+        addError(errors, `task.model_execution.${campo}`,
+          'records a run, but task.model_execution.executor is empty; nothing can be tested or reviewed before it executes');
+      }
     }
     return;
   }
