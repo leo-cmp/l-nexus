@@ -456,6 +456,22 @@ plausivel no lugar de `unknown` nao preenche uma lacuna: cria uma afirmacao
 falsa sobre quem fez o trabalho, e e sobre essa afirmacao que a regra de papeis
 disjuntos decide depois.
 
+O validador trata os dois casos de forma diferente, e por isso a saida honesta
+nao te prende:
+
+- **R1** aceita `unknown` e registra um aviso. Ali os papeis nao precisam de
+  modelos distintos, entao nao ha nada que o nome provaria;
+- **R2 e R3** recusam. Onde a rota exige que executor e revisor caiam em modelos
+  diferentes, nao saber quem respondeu e nao poder provar coisa alguma -- e o
+  caminho nao e inventar um nome, e ligar o observador;
+- **campo vazio** e erro em qualquer nivel. "Nao observei" e uma afirmacao;
+  deixar em branco nao e.
+
+Para que `unknown` deixe de ser necessario, o run precisa de um observador:
+`lnx-run.sh --observe-bin <script>`, cujo argv recebe `{run_dir}` e escreve em
+`observed-model` o nome que a resposta trouxe. Sem ele, nenhuma versao do kit
+tem como saber quem atendeu, e task orquestrada em R2/R3 nao fecha.
+
 ### `run_id`: o que sustenta o gate
 
 Cada entrada de `tests[]` e `reviews[]` deve trazer o `run_id` da execução que a
