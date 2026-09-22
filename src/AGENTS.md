@@ -126,6 +126,33 @@ Fluxo fast-track:
 
 Se QUALQUER dúvida surgir durante o fast-track, aborte e siga o fluxo normal.
 
+## Quanto Cerimonial a Demanda Merece
+
+Sao tres modos, e quem escolhe e o RISCO -- nao o tamanho da task, nao quantos
+arquivos ela toca, e nunca o agente por iniciativa propria:
+
+| Modo | Quando | Como |
+|------|--------|------|
+| **Fast-track** | gatilho por keyword acima, 1 arquivo | executa direto, sem task |
+| **Direto** (`mode: manual`) | **R1** | executa na propria sessao, registra evidencia na task |
+| **Orquestrado** (`mode: orchestrated`) | **R2 e R3** | ciclo completo: executor, tester e reviewer delegados |
+
+**R1 nao se orquestra.** Em R1 o catalogo ja diz que revisao e teste sao
+opcionais e que os papeis nao precisam de modelos distintos
+(`routes.R1.independent_model: false`). Montar executor, tester e reviewer
+separados ali nao acrescenta garantia nenhuma -- so acrescenta um ciclo de
+delegacao, tres registros de proveniencia para preencher e tres formas novas de
+errar. Uma task R1 de setup ja foi parar num reviewer `frontier` improvisado
+fora do plano, com o mesmo modelo assinando execucao e revisao, porque nada
+dizia que ali nao havia o que orquestrar.
+
+Numero de arquivos **nao** promove o modo. Uma task R1 que cria seis arquivos
+continua sendo direta; o que existe sobre quantidade e o limite de escopo
+abaixo, que manda QUEBRAR a task, nao cerimonia-la.
+
+O humano pode pedir orquestracao de uma R1 quando quiser -- e decisao dele.
+O agente nao se promove sozinho.
+
 ## Fluxo Obrigatorio
 
 

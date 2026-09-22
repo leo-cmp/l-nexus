@@ -6,8 +6,9 @@
 - Antes de modificar codigo, preencha `model_execution.executor` com agente,
   provedor, modelo exato e instante de inicio. Use `unknown` quando o runtime nao
   expuser a identidade; nunca infira.
-- Confirme que o executor satisfaz o perfil exigido em `model_plan` e
-  `.ai/model-routing.yaml`. Identidade `unknown` nao executa R3 por padrao.
+- Confirme que o combo do executor e o que `roles` manda para o nivel de risco
+  da task. Nao ha perfil nem modelo a conferir antes de executar: quem resolve o
+  combo e o gateway, e quem atendeu so se sabe pela resposta.
 - Nao inicie task que depende de outra task cujo PR ainda nao foi mergeado na branch principal (develop/main). Se houver dependencia aberta, pare e avise o usuario.
 - Nao execute pedido generico como "conforme planejado"; exija caminho de task em `.planning/PLAN_VN/tasks/*.md`.
 - Se criar ou alterar migrations/seeders, rode-os conforme `.ai/guidelines/stacks/<stack>.md` antes dos testes de aceite.

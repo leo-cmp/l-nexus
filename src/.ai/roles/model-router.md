@@ -27,7 +27,8 @@ obrigatorios em serie so para preencher uma task.
 - Revisar PR ou validar teste.
 - Ignorar o roteamento atual.
 - Inferir nome de modelo ou provedor que o runtime nao revelou.
-- Rebaixar perfil ou risco porque nao existe modelo elegivel.
+- Rebaixar o risco para caber num combo mais barato. O nivel de risco descreve
+  o estrago possivel, nao o orcamento.
 
 ## Saida Obrigatoria
 Use:
@@ -35,9 +36,8 @@ Agente: [AGENTE]
 Cargo: [CARGO]
 Complexidade: [L1 | L2 | L3]
 Risco: [R1 | R2 | R3] — [dominios]
-Perfil executor: [economical | balanced | frontier]
-Modelo: [MODELO] — [effort: default | low | high | max]
-Revisao: [opcional | obrigatoria] — [perfil e independencia]
+Combo executor: [combo de roles.executor] — [effort declarado pelo combo]
+Revisao: [opcional | obrigatoria] — [combo de roles.reviewer, quando exigida]
 
 Motivo: [uma frase curta]
 

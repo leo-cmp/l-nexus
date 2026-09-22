@@ -343,12 +343,12 @@ sobreviver é copiada para o `Log de Evidencias` da task.
 
 Se o `cli_runners` escolhido não declarar `effort.supported: true`:
 
-- **não registre** que o effort foi aplicado;
-- se o modelo já atinge o perfil exigido na variante `default`, prossiga e
-  registre a limitação;
-- se o modelo só atinge o perfil exigido **acima** da variante `default`, então
-  o effort é o que o torna elegível: **bloqueie** e escolha outro runner ou
-  outro slot. O validador rejeita esse caso.
+- **não registre** que o effort foi aplicado — o campo é declaração do que foi
+  pedido, e creditar um nível que a CLI não sabe enviar torna o registro falso;
+- **bloqueie e avise.** O effort é o que o combo declara, e na schema 3 não há
+  variante nem slot alternativo para onde escapar: ou o runner aplica o nível
+  pedido, ou aquela execução não pode ser creditada como tendo o effort do
+  combo.
 
 ---
 
@@ -434,6 +434,27 @@ Múltiplos terminais não relaxam nenhuma regra:
 Registre em `model_execution`: orquestrador, executor (com `selection`, effort,
 runner e tentativas), cada execução de teste e cada review, sempre com o commit
 avaliado.
+
+### `model`: de onde ele pode vir, e de onde nao pode
+
+Tres fontes ficam a mao na hora de preencher `model`, e **duas estao erradas**:
+
+- **o nome do runner.** `runner: claude` nao diz nada sobre quem respondeu.
+  Deduzir `claude-sonnet-5` dali ja aconteceu, e o validador pegou. O runner e
+  a CLI que falou com o gateway; o gateway e que escolheu o modelo;
+- **`meta.json`.** Parece a fonte oficial, e nao e. O campo `model` dele e o eco
+  do que foi passado em `--model`, que na schema 3 e o **combo** -- numa
+  execucao perfeita ele vale `9r-executor`. E o registro do que foi PEDIDO. Copiar
+  dali produz exatamente o erro que o validador recusa: *records the combo name
+  instead of the model that answered*;
+- **`observed-model` no run dir, ou a propria resposta.** Esta e a fonte. So
+  existe quando o kit foi configurado com `--observe-bin`.
+
+Sem observador e sem a resposta a mao, o valor correto e `unknown`. Ele nao e
+falha de registro -- e o registro honesto de que ninguem observou. Um nome
+plausivel no lugar de `unknown` nao preenche uma lacuna: cria uma afirmacao
+falsa sobre quem fez o trabalho, e e sobre essa afirmacao que a regra de papeis
+disjuntos decide depois.
 
 ### `run_id`: o que sustenta o gate
 
