@@ -101,35 +101,40 @@ risk_domains:
     - material-concurrency-idempotency
   project: []
 
-# Runners que consomem credito PAGO DIRETO da conta do humano, fora das
-# assinaturas de opencode e agy. Ficam desligados por padrao: um roteamento que
-# escolhe sozinho o caminho caro transforma decisao de orcamento em acidente.
+# Qual CLI fala com o gateway. Na schema 3 isto nao e uma escolha: o combo diz
+# o runner quando quer um especifico, senao vale `default_runner`. O Orchestrator
+# LE esta secao, nao procura dentro dela -- nao ha indice por modelo porque nao
+# ha modelo a casar, e quem resolve o combo e o gateway.
 #
-# Ligar e decisao humana e consciente. Com `enabled: false`, o Planner nao deve
-# colocar nos slots nenhum modelo cujo unico runner esteja desligado, e o
-# Orchestrator nao deve ativa-lo nem como ultimo recurso — bloqueia e avisa.
+# `claude` e o unico runner publicado porque e o unico que fala com o 9router
+# pelos combos e o unico medido entregando o esforco pedido: o log do gateway
+# registra o nivel nas requisicoes dele, enquanto as do opencode chegam sempre
+# no mesmo nivel, independente do que foi pedido.
+#
+# As outras CLIs sairam do kit junto com a poda. Elas nao foram apagadas de quem
+# ja as tinha: `cli_runners` e MERGED no sync, entao runner local continua no
+# arquivo do projeto. O que mudou e que instalacao nova nao recebe um cardapio de
+# seis opcoes para uma decisao que nao existe -- foi esse cardapio que fez um
+# Orchestrator parar no meio de uma task e perguntar ao humano qual CLI usar.
 runner_policy:
   claude:
-    # Ligado: a assinatura esta ativa. E o unico runner medido que de fato
-    # entrega o esforco pedido -- o log do gateway registra THINK:high nas
-    # requisicoes dele, enquanto as do opencode chegam sempre como THINK:low.
-    # Apontado para um gateway local por settings.local.json ele nem consome a
-    # API da Anthropic: gasta a cota do gateway. Reveja se a assinatura nao for
-    # renovada, que e o unico motivo para desligar de novo.
+    # Ligado: a assinatura esta ativa. Apontado para um gateway local por
+    # settings.local.json ele nem consome a API da Anthropic: gasta a cota do
+    # gateway. Reveja se a assinatura nao for renovada, que e o unico motivo
+    # para desligar.
+    #
+    # Isto e porta, nao aviso: `enabled: false` aqui faz o validador RECUSAR o
+    # roteamento que aponta para este runner, em vez de deixar passar calado.
+    # Runner que so o projeto declarou, sem entrada aqui, conta como ligado --
+    # quem o acrescentou a mao sabe o que esta pagando.
     enabled: true
     conta: "Assinatura Claude ativa; por gateway local nao toca a API paga"
-  codex:
-    enabled: false
-    conta: "API OpenAI do humano, cobrada por token"
-  qwen:
-    enabled: false
-    conta: "Assinatura Qwen Code, nao contratada; os modelos alibaba sao alcancados por opencode-qwen"
 
 cli_runners:
-  # Interfaces verificadas contra os binarios instalados em 2026-08-31 com
-  # `--help`. Ao trocar de CLI ou de versao, confirme antes de editar: um
-  # template errado trava a delegacao (modo interativo que nao retorna) ou
-  # credita um effort que a CLI nao aplica.
+  # Interface verificada contra o binario instalado com `--help`. Ao trocar de
+  # CLI ou de versao, confirme antes de editar: um template errado trava a
+  # delegacao (modo interativo que nao retorna) ou credita um effort que a CLI
+  # nao aplica.
   #
   # argv         modo nao interativo, uma tacada so (gate automatico)
   # interactive  sessao que continua aberta, para o Orchestrator conduzir
@@ -137,23 +142,10 @@ cli_runners:
   #              e opt-in por invocacao, porque desliga a confirmacao da
   #              propria CLI e contraria a regra do l-nexus de que comando
   #              destrutivo exige confirmacao humana. Evite em R3.
-  codex:
-    binary: "codex"
-    # `codex exec ... -` le as instrucoes do stdin.
-    argv: [ "exec", "--model", "{model}", "-" ]
-    prompt_delivery: stdin
-    interactive:
-      # Sem subcomando as opcoes vao para a CLI interativa; PROMPT e posicional.
-      supported: true
-      argv: [ "--model", "{model}", "{prompt}" ]
-    autonomy:
-      supported: true
-      argv: [ "--dangerously-bypass-approvals-and-sandbox" ]
-    default_model: "gpt-5.6-sol"
-    effort:
-      # Nao verificado nesta versao da CLI. Deixe false ate confirmar.
-      supported: false
-      argv: []
+  #
+  # `{model}` recebe o nome do COMBO, nao um modelo: e o combo que o gateway
+  # sabe resolver. Por isso nao ha `default_model` aqui -- um padrao de modelo
+  # so poderia furar o roteamento por combo, silenciosamente.
   claude:
     binary: "claude"
     argv: [ "-p", "{prompt}", "--model", "{model}" ]
@@ -165,86 +157,10 @@ cli_runners:
     autonomy:
       supported: true
       argv: [ "--dangerously-skip-permissions" ]
-    default_model: "claude-sonnet-5"
     effort:
       # `--effort low|medium|high|xhigh|max`
       supported: true
       argv: [ "--effort", "{effort}" ]
-  opencode:
-    binary: "opencode"
-    # O subcomando `run` e o modo nao interativo; sem ele a TUI abre e trava.
-    argv: [ "run", "--model", "{model}", "{prompt}" ]
-    prompt_delivery: argv
-    interactive:
-      # A TUI abre sem aceitar prompt inicial, entao nao da para conduzir por
-      # send a partir da abertura. Use o modo `run`.
-      supported: false
-      argv: []
-    autonomy:
-      supported: true
-      argv: [ "--auto" ]
-    default_model: "deepseek-v4-flash"
-    effort:
-      # DESLIGADO de proposito nesta entrada generica. O `--variant` repassa o
-      # nivel ao provedor, mas o vocabulario e DO MODELO, nao da CLI: DeepSeek so
-      # aceita high/max, Qwen nao tem max, GLM e MiniMax so tem `thinking`, e ha
-      # modelos sem controle nenhum. Um mapping unico aqui mentiria para a
-      # maioria -- mandar `max` a um Qwen devolve 400. Quem precisa de esforco
-      # usa uma das entradas por familia abaixo, onde o mapping pode ser honesto.
-      supported: false
-      argv: [ "--variant", "{effort}" ]
-  agy:
-    binary: "agy"
-    # `--print` e obrigatorio: sem ele a sessao abre interativa e nao retorna.
-    argv: [ "--model", "{model}", "--print", "{prompt}" ]
-    prompt_delivery: argv
-    interactive:
-      # `-i` executa o prompt inicial e mantem a sessao aberta.
-      supported: true
-      argv: [ "--model", "{model}", "-i", "{prompt}" ]
-    autonomy:
-      supported: true
-      argv: [ "--dangerously-skip-permissions" ]
-    # Os ids desta CLI embutem o esforco no proprio nome do modelo
-    # (ex.: `<familia>-high` / `-medium` / `-low`). Consulte `agy models`.
-    default_model: "gemini-3.7-flash-high"
-    effort:
-      # `--effort low|medium|high`. Nao existe `max`, entao `max` fica fora do
-      # mapping de proposito: creditar um esforco inexistente seria mentira.
-      supported: true
-      argv: [ "--effort", "{effort}" ]
-  qwen:
-    binary: "qwen"
-    argv: [ "--model", "{model}", "--prompt", "{prompt}" ]
-    prompt_delivery: argv
-    interactive:
-      # `-i, --prompt-interactive`
-      supported: true
-      argv: [ "--model", "{model}", "-i", "{prompt}" ]
-    autonomy:
-      # Esta versao nao expoe nenhuma flag de aprovacao automatica. Declarar
-      # uma inexistente faria a delegacao falhar na abertura.
-      supported: false
-      argv: []
-    default_model: "qwen3.7-plus"
-    effort:
-      supported: false
-      argv: []
-  kimi:
-    binary: "kimi"
-    argv: [ "--model", "{model}", "--prompt", "{prompt}" ]
-    prompt_delivery: argv
-    interactive:
-      # Nao aceita prompt posicional; so `-c/--continue` retoma sessao.
-      supported: false
-      argv: []
-    autonomy:
-      supported: true
-      argv: [ "--yolo" ]
-    default_model: "kimi-k2-chat"
-    effort:
-      supported: false
-      argv: []
 
 # Adaptadores de terminal visível (Linux-first). `preference` é a ordem tentada
 # quando o Orchestrator pede `--terminal auto`. `tmux` só é elegível dentro de
@@ -254,13 +170,6 @@ cli_runners:
 # Para um emulador fora da lista, use `custom` com `argv` e os placeholders
 # {title} {cwd} {command} — o l-nexus repassa isso a `lnx-run.sh --terminal-cmd`.
 
-# Adaptadores de terminal visível (Linux-first). `preference` é a ordem tentada
-# quando o Orchestrator pede `--terminal auto`. `tmux` só é elegível dentro de
-# uma sessão tmux. Se nada abrir, o l-nexus NÃO executa em background escondido:
-# ele bloqueia com o motivo ou roda inline no terminal atual (fallback).
-#
-# Para um emulador fora da lista, use `custom` com `argv` e os placeholders
-# {title} {cwd} {command} — o l-nexus repassa isso a `lnx-run.sh --terminal-cmd`.
 terminal_runners:
   preference: [ tmux, gnome-terminal, konsole, xfce4-terminal, kitty, alacritty, wezterm, tilix, terminator, x-terminal-emulator, xterm ]
   fallback: inline

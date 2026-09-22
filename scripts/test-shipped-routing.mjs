@@ -192,3 +192,70 @@ test('a implementacao nao embute nome de combo, runner ou modelo', () => {
   }
   assert.deepEqual(problemas, [], problemas.join('\n'));
 });
+
+// A promessa desta suite -- instalacao nova produz task que valida sem ninguem
+// editar nada antes -- nunca tinha sido medida no estado em que toda task passa
+// primeiro: recem-criada, pendente, sem uma linha de execucao. As fixtures eram
+// todas `state: done` com proveniencia preenchida, entao o esqueleto vazio que o
+// template publica reprovava em tres campos e nenhum teste via.
+const templatePublicado = (nome) => readFileSync(
+  path.join(rootDirectory, 'src', '.ai', 'templates', nome), 'utf8');
+
+// So o que o Planner preenche. A proveniencia fica como o template a entrega:
+// e justamente ela que esta sob teste.
+function comoOPlannerPreencheria(template, { nivel = 'R1' } = {}) {
+  const catalogo = shippedCatalog();
+  const combo = (papel) => (nivel === 'R3' && catalogo.roles[papel].critical)
+    || catalogo.roles[papel].default;
+  const effort = (papel) => catalogo.combos[combo(papel)].effort;
+  return template
+    .replace('id: TASK-XXX', 'id: task_recem_criada')
+    .replace('title: "[Titulo descritivo]"', 'title: "Task recem criada"')
+    .replace('complexity: "[L1 | L2 | L3]"', 'complexity: "L1"')
+    .replace('level: "[R1 | R2 | R3]"', `level: "${nivel}"`)
+    .replace('rationale: "[impacto caso a implementacao esteja errada]"', 'rationale: "Reversivel."')
+    .replace('agent: "[agente]"', 'agent: "planner"')
+    .replace('provider: "[provedor ou unknown]"', 'provider: "provider-a"')
+    .replace('model: "[modelo exato ou unknown]"', 'model: "model-planner"')
+    .replace('combo: "[combo de roles.executor]"', `combo: "${combo('executor')}"`)
+    .replace('combo: "[combo de roles.tester, ou remova se o risco nao exige teste]"', `combo: "${combo('tester')}"`)
+    .replace('combo: "[combo de roles.reviewer, ou remova se o risco nao exige revisao]"', `combo: "${combo('reviewer')}"`)
+    .replace('effort: "[effort declarado para o combo]"', `effort: "${effort('executor')}"`)
+    .replace('effort: "[effort declarado para o combo]"', `effort: "${effort('tester')}"`)
+    .replace('effort: "[effort declarado para o combo]"', `effort: "${effort('reviewer')}"`);
+}
+
+for (const nome of ['task.md', 'task-short.md']) {
+  test(`E2E — uma task pendente criada do template ${nome} valida sem edicao`, () => {
+    const result = run({ task: comoOPlannerPreencheria(templatePublicado(nome)) });
+    assert.equal(result.status, 0, result.stderr);
+  });
+}
+
+// R3 e o nivel estrito: exige teste e revisao. Ainda assim, cobrar os portoes de
+// uma task que nao comecou seria cobrar prova de fato que nao aconteceu.
+test('E2E — uma task R3 pendente nao e cobrada dos portoes antes de executar', () => {
+  const result = run({ task: comoOPlannerPreencheria(templatePublicado('task.md'), { nivel: 'R3' }) });
+  assert.equal(result.status, 0, result.stderr);
+});
+
+// O esqueleto vazio nao pode virar porta dos fundos: a task fechada continua
+// tendo que dizer quem executou.
+test('E2E — o esqueleto vazio nao fecha uma task done', () => {
+  const pendente = comoOPlannerPreencheria(templatePublicado('task.md'));
+  const result = run({ task: pendente.replace('  state: pending', '  state: done') });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /must record who executed once the task is done/);
+});
+
+// Nem porta dos fundos do outro lado: veredito registrado sobre execucao que o
+// proprio arquivo diz nao ter acontecido e contradicao, nao task pendente.
+test('E2E — veredito sem execucao e contradicao', () => {
+  const pendente = comoOPlannerPreencheria(templatePublicado('task.md'));
+  const result = run({
+    task: pendente.replace('  tests: []',
+      '  tests:\n    - combo: "9r-tester"\n      model: "modelo-que-testou"\n      verdict: "passed"\n      commit: "abc1234"'),
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /nothing can be tested or reviewed before it executes/);
+});

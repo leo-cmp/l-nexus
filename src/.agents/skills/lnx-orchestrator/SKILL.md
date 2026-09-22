@@ -39,7 +39,7 @@ Você **não** replaneja a task e **não** implementa o código. Você coordena.
 4. Confirme branch/worktree da task e que `git status` não mostra alterações
    alheias ao escopo. Se mostrar, pare e pergunte.
 5. Leia `.ai/model-routing.yaml`: `routes`, `project_policy`, `execution_policy`,
-   `models`, `cli_runners`, `terminal_runners`.
+   `combos`, `roles`, `default_runner`, `cli_runners`, `terminal_runners`.
 6. Determine os gates obrigatórios: review (por `risk` + `r2_review`) e teste
    (por `risk` + `r2_test_gate`).
 7. Registre sua própria identidade em `model_execution.orchestrator` (agente,
@@ -62,27 +62,30 @@ executar**: dois combos distintos podem cair no mesmo modelo, e o kit não vê
 dentro do combo. A checagem acontece depois, comparando o campo `model` que cada
 resposta devolveu — e é por isso que registrá-lo corretamente não é burocracia.
 
-### Resolver o CLI runner (camada separada do modelo)
+### O CLI runner não é uma escolha sua
 
-1. Se o projeto fixou um runner para o slot, use-o.
-2. Senão, procure em `cli_runners` uma entrada cujo `provides.models` contenha a
-   chave do modelo.
-3. Senão, uma cujo `provides.providers` contenha o provedor do modelo.
-4. Exatamente um candidato → use. Vários candidatos e nenhuma preferência →
-   **pergunte ao humano**. Nenhum candidato → **bloqueie**.
+`combos.<nome>.runner`, senão `default_runner`. Acabou — você **lê** o runner,
+não o procura. Não existe índice de runner por modelo, porque não existe modelo
+a casar: quem resolve o combo é o gateway, e ele só diz quem atendeu **depois**
+de responder.
 
-Nunca assuma um mapeamento fixo entre provedor e CLI.
+Se você se pegar montando uma lista de candidatos, comparando CLIs ou pensando
+em perguntar ao humano qual usar, **pare**: você está resolvendo um problema que
+a schema 3 apagou, e a resposta já está escrita em duas linhas do catálogo.
+
+Só há dois motivos para bloquear aqui, e nenhum deles é dúvida:
+
+- o runner resolvido não existe em `cli_runners`;
+- ele está `enabled: false` em `runner_policy` — decisão de orçamento do humano,
+  que você não contorna. O validador também recusa esse roteamento.
 
 ### Effort
 
-Se o runner escolhido não declarar `effort.supported: true`:
-
-- se o modelo já atinge o perfil exigido na variante `default`, prossiga e
-  registre a limitação no `Log de Evidencias`;
-- se o modelo só atinge o perfil exigido **acima** da variante `default`,
-  **bloqueie**: o effort é o que o torna elegível e a CLI não sabe aplicá-lo.
-  Escolha outro runner ou outro slot. Nunca registre um effort que não foi
-  aplicado.
+O effort vem do combo, e o combo já o declara. Se o runner resolvido não
+declarar `effort.supported: true`, ele não sabe aplicar o nível pedido:
+**bloqueie e avise**. Nunca registre em `model_execution` um effort que a CLI
+não aplicou — esse campo é declaração do que foi pedido, e mentir nele faz o
+`--effort` do gate virar enfeite.
 
 ### Terminal
 
@@ -111,7 +114,7 @@ Se o runner escolhido não declarar `effort.supported: true`:
 ```bash
 .agents/scripts/lnx-run.sh start \
   --task <task-id> --role executor --slot <slot> --attempt <n> \
-  --model <chave-do-catalogo> --effort <effort> \
+  --model <combo-do-plano> --effort <effort> \
   --runner <nome> --runner-bin <binario> \
   --runner-arg <cada elemento de cli_runners.<nome>.argv> \
   --prompt-file <caminho-do-prompt> \
