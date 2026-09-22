@@ -426,8 +426,11 @@ cp -r "$SRC_DIR/.ai/subagents" "$TARGET/.ai/subagents"
 
 
 # Roteamento de modelos pertence ao projeto depois da primeira instalacao.
+ROUTING_PREEXISTING=0
 if [ ! -f "$TARGET/.ai/model-routing.yaml" ]; then
     cp "$SRC_DIR/.ai/model-routing.yaml" "$TARGET/.ai/model-routing.yaml"
+else
+    ROUTING_PREEXISTING=1
 fi
 
 # Skills
@@ -524,6 +527,30 @@ echo "  ✓ .agents/scripts/ (lnx-run.sh — delegacao em terminal visivel)"
 echo "  ✓ AGENTS.md, CLAUDE.md, GEMINI.md"
 echo "  ✓ .mcp.json"
 echo ""
+
+# O update troca skills, diretrizes e scripts, e nunca encostou no
+# model-routing.yaml de um projeto ja instalado -- nem dizia isso. Quem
+# atualizava ficava com o kit novo e o catalogo velho: combos e runners que o kit
+# ja tinha mudado seguiam ali, e o descompasso so aparecia quando um agente agia
+# pelo catalogo antigo. Aconteceu: uma poda de runners publicada no kit nao
+# chegou ao projeto, e o Orchestrator seguiu oferecendo CLIs que tinham saido.
+#
+# Aqui o dry-run fala. Escrever continua sendo decisao de quem atualiza -- o
+# padrao do sync-routing e nao escrever, e o update nao vai ser a excecao.
+if [ "$ROUTING_PREEXISTING" = "1" ] && command -v node >/dev/null 2>&1; then
+    routing_diff="$(node "$SCRIPT_DIR/sync-routing.mjs" "$TARGET/.ai/model-routing.yaml" 2>/dev/null || true)"
+    if printf '%s' "$routing_diff" | grep -q "^Mudaria"; then
+        echo "📐 Seu .ai/model-routing.yaml NAO foi atualizado (ele e do projeto)."
+        echo "   O kit mudou o roteamento desde a sua versao:"
+        echo ""
+        printf '%s\n' "$routing_diff" | sed 's/^/   /'
+        echo ""
+        echo "   Para aplicar:"
+        echo "     npx @leo-cmp/l-nexus sync-routing .ai/model-routing.yaml --write"
+        echo ""
+    fi
+fi
+
 echo "Proximo passo:"
 echo "  Se o projeto ja possui codigo existente, execute /lnx-projeto-revisar para"
 echo "  analisar automaticamente a stack, preencher .ai/project.md e mapear"

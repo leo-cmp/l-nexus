@@ -101,6 +101,11 @@ risk_domains:
     - tenant-account-isolation
     - backup-restore-deployment
     - material-concurrency-idempotency
+    # Apontar o projeto para um datastore que ja tem dados de outro sistema, ou
+    # para um que o projeto nao criou. Entrou porque um executor fez exatamente
+    # isso e nada barrou: o dano nao vem de comando destrutivo, vem de migration
+    # aditiva num destino que pertence a terceiros.
+    - shared-datastore-adoption
   project: []
 
 # Qual CLI fala com o gateway. Na schema 3 isto nao e uma escolha: o combo diz

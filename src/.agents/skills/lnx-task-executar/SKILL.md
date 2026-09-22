@@ -55,6 +55,14 @@ Depois de localizar a task (passo 1), verifique `model_plan.schema`:
      - Informe o usuario: "Entidade X referenciada na task nao existe no codigo. Task precisa ser revisada."
    - Se todas passarem: prossiga para o passo 3.
    - Exemplos de verificacao: model existe? `find app/Models -name "User.php"`; rota ja existe? `grep -r "api/products" app/Config/Routes.php`; migration ja existe? `find app/Database/Migrations -name "*CreateOrders*"`.
+   - **Recurso externo com estado inverte a regra.** Banco, bucket, fila ou
+     indice que ja existe e que este projeto nao criou e motivo para **parar e
+     perguntar**, nao para reusar. Nao escreva credencial de conexao nem rode
+     migration antes de confirmar que o destino e deste projeto: o banco conter
+     tabelas alheias, ou o banco do projeto nao existir e voce nao ter
+     privilegio para cria-lo, sao os dois sinais de parada. Conseguir conectar
+     nao prova que e seu. Ver `.ai/guidelines/core/database.md` e
+     `.ai/guidelines/core/external-resources.md`.
 
 3. **Preparar execucao:**
    - > [!IMPORTANT]

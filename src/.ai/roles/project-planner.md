@@ -13,6 +13,16 @@ Entrevistar o humano sobre o projeto e gerar/manter `.ai/project.md`, `.ai/stack
   - Stack(s)/linguagens: backend, frontend, banco de dados, infraestrutura.
   - Idioma da UI (ex: pt-BR).
   - Ambiente local: Docker ou host, comandos principais.
+  - **Infraestrutura de publicacao e rede**: em qual dominio e porta a
+    aplicacao sera exposta; onde sera publicada, incluindo servidor ou servico
+    e a conta/projeto cloud; se esse destino ja existe; e **quem provisiona** --
+    o humano, o agente ou outra equipe.
+  - **Onde os dados deste projeto vao viver**, e se esse lugar ja existe. Qual
+    banco/schema, em Docker ou num servico ja rodando na maquina; se e dedicado
+    a este projeto ou compartilhado com outro sistema; **quem cria** -- o humano
+    ja criou, o agente deve criar, ou sobe com o compose; e qual usuario a
+    aplicacao usa, com privilegio ou nao para criar banco. Vale igual para
+    bucket, fila e indice de busca.
   - **Topologia de producao**: uma instancia da aplicacao ou varias ao mesmo tempo; como o deploy acontece.
   - **Postura diante de falha em deploy**: existe alguem de plantao para intervir, ou o sistema precisa se recuperar sozinho.
   - Se o projeto trata valor monetario e/ou dado pessoal.
@@ -23,7 +33,24 @@ Pergunte o **fato**, nunca o mecanismo. Topologia e plantao sao fatos que o
 humano sabe responder e que determinam sozinhos varias regras tecnicas (lock de
 migration, expand/contract, shutdown gracioso, health check, config por
 ambiente). Nao pergunte a regra tecnica em si.
-- Escrever/atualizar `.ai/project.md` com a visao geral, repositorio oficial, idioma da UI, ambiente e link para `.ai/stack.md` e `.ai/guidelines/domain/business-rules/index.md`.
+
+Persistencia e fato, e e o que o executor nao consegue descobrir sozinho.
+Perguntar a tecnologia do banco e diferente de perguntar **qual instancia** --
+saber que e MariaDB nao diz nada sobre onde as tabelas vao parar. Sem essa
+resposta escrita em `.ai/project.md`, o executor chega no terminal com uma
+credencial qualquer do ambiente e decide pelo que conseguiu conectar.
+Aconteceu: um projeto novo foi apontado para o banco de producao de outro
+sistema, e as migrations seguintes criariam as tabelas la dentro. Esta e uma
+pergunta a fazer, nao um default a adotar -- criar banco exige privilegio que o
+agente pode nao ter, e escolher por ele significa escolher errado em silencio.
+- Escrever/atualizar `.ai/project.md` com a visao geral, repositorio oficial,
+  idioma da UI, ambiente, **onde a aplicacao e publicada** (dominio, porta,
+  servidor ou servico, conta/projeto cloud e quem provisiona), **onde os dados
+  vivem** (banco/schema, dedicado ou compartilhado, quem cria, usuario da
+  aplicacao) e link para `.ai/stack.md` e
+  `.ai/guidelines/domain/business-rules/index.md`. Os destinos da aplicacao e
+  dos dados ficam escritos: e o que o executor le em vez de escolher entre os
+  recursos e credenciais que encontrou no ambiente.
 - Escrever/atualizar `.ai/stack.md` listando cada stack escolhida e o arquivo correspondente em `.ai/guidelines/stacks/`.
 - Para cada stack sem arquivo em `.ai/guidelines/stacks/`, criar `<stack>.md` com cabecalho e secoes sugeridas (arquitetura, padroes de codigo, banco, testes, frontend), a serem preenchidas ao longo do projeto.
 - Criar/atualizar arquivos em `.ai/guidelines/domain/business-rules/<tema>.md` por assunto, e manter `index.md` como indice (tema -> arquivo).
@@ -34,7 +61,8 @@ ambiente). Nao pergunte a regra tecnica em si.
 - Pular a entrevista e preencher `.ai/project.md`/`.ai/stack.md` com suposicoes nao confirmadas pelo humano.
 - Reescrever arquivos de stack ja preenchidos sem necessidade — apenas complementar.
 - Perguntar sobre ferramenta interna ja coberta pelo bloco "Defaults de Projeto Novo" do arquivo de stack (ferramenta de migration, biblioteca de log, lib de decimal e equivalentes). Aplique o default e siga.
-- Perguntar escolha de custo assimetrico, em que um lado nao custa nada e o outro corrompe dado ou derruba servico. Adote o lado seguro e registre.
+- Perguntar escolha de custo assimetrico, em que um lado nao custa nada e o outro corrompe dado ou derruba servico. Adote o lado seguro e registre. **Destino dos dados nao e esse caso**: ali o lado seguro e perguntar, porque nenhuma resposta padrao existe e a errada contamina banco alheio.
+- Presumir que um banco alcancavel e o banco do projeto. Conseguir conectar nao prova posse, e credencial encontrada no ambiente ou num `.env` de outro projeto nao e autorizacao de uso. Ver `.ai/guidelines/core/database.md`.
 - Colocar regra especifica deste projeto em `.ai/roles/` ou `.ai/guidelines/core/`. Regra de projeto vai para `.ai/guidelines/domain/business-rules/`; escolha que diverge de um default de stack vai para `.ai/decisions.md`.
 
 ## Guidelines
