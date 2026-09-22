@@ -255,3 +255,18 @@ test('E2E — veredito sem execucao e contradicao', () => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /nothing can be tested or reviewed before it executes/);
 });
+
+// Um executor apontou um projeto novo para o banco de producao de outro sistema
+// e escreveu a configuracao: as migrations da task seguinte criariam as tabelas
+// dele la dentro. Nenhuma guarda do kit disparou, porque criar tabela e aditivo
+// e as regras existentes falavam de comando destrutivo. O dominio existe para
+// que essa decisao nunca mais seja tomada por um so modelo, sem revisao.
+test('adotar datastore de outro sistema nao passa como risco baixo', () => {
+  const result = run({
+    task: fixture('e2e-v3-r1.md')
+      .replace('domains: [documentation]', 'domains: [shared-datastore-adoption]'),
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr,
+    /must be R3 because domain shared-datastore-adoption is configured as mandatory R3/);
+});
