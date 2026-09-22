@@ -1,6 +1,6 @@
 {
   "name": "@leo-cmp/l-nexus",
-  "version": "0.15.0",
+  "version": "0.15.1",
   "description": "Central port\u00e1til de configura\u00e7\u00e3o e diretrizes para agentes de IA \u2014 skills, roles, guidelines e templates versionados",
   "bin": {
     "l-nexus": "scripts/cli.mjs"
