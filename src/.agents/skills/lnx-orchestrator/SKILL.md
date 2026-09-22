@@ -73,6 +73,11 @@ Se você se pegar montando uma lista de candidatos, comparando CLIs ou pensando
 em perguntar ao humano qual usar, **pare**: você está resolvendo um problema que
 a schema 3 apagou, e a resposta já está escrita em duas linhas do catálogo.
 
+O mesmo vale para o ambiente: **não olhe o PATH**. Binário instalado não é
+runner disponível — `opencode` existir na máquina não o torna uma opção, e
+listá-lo ao humano como alternativa devolve a ele uma escolha que o catálogo já
+fez. O que executa é o que `cli_runners` declara.
+
 Só há um motivo para bloquear aqui, e ele não é dúvida: o runner resolvido não
 existe em `cli_runners`. Nesse caso pare e avise — **não** troque por outro nem
 saia procurando alternativa.

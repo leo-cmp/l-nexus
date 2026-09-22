@@ -1,6 +1,13 @@
 # Diretriz de Delegação por Terminal CLI (Multi-Model CLI Delegation)
 
-Esta diretriz estabelece o padrão para um agente de IA no runtime atual (seja ele **Codex**, **Cursor**, **Gemini CLI**, **Antigravity**, **Claude Code**, **OpenCode** ou qualquer outro) delegar tarefas para outras ferramentas de CLI instaladas no ambiente via terminal.
+Esta diretriz estabelece o padrão para um agente de IA no runtime atual (seja ele **Codex**, **Cursor**, **Gemini CLI**, **Antigravity**, **Claude Code**, **OpenCode** ou qualquer outro) delegar tarefas para a CLI que `.ai/model-routing.yaml` declara, via terminal.
+
+> **O PATH não é o catálogo.** Não inventarie binários instalados, não rode
+> `which`/`command -v` para descobrir runners e não ofereça ao humano uma CLI
+> porque ela existe na máquina. O que pode executar é o que `cli_runners`
+> declara — nada mais, mesmo que o binário esteja ali. Anunciar "também
+> disponíveis: X, Y" transforma uma linha de configuração numa decisão que o
+> humano não pediu para tomar.
 
 > Nenhum runtime é o orquestrador oficial do l-nexus e nenhum modelo tem CLI
 > fixa. A cadeia é sempre:
