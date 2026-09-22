@@ -13,6 +13,10 @@ Entrevistar o humano sobre o projeto e gerar/manter `.ai/project.md`, `.ai/stack
   - Stack(s)/linguagens: backend, frontend, banco de dados, infraestrutura.
   - Idioma da UI (ex: pt-BR).
   - Ambiente local: Docker ou host, comandos principais.
+  - **Infraestrutura de publicacao e rede**: em qual dominio e porta a
+    aplicacao sera exposta; onde sera publicada, incluindo servidor ou servico
+    e a conta/projeto cloud; se esse destino ja existe; e **quem provisiona** --
+    o humano, o agente ou outra equipe.
   - **Onde os dados deste projeto vao viver**, e se esse lugar ja existe. Qual
     banco/schema, em Docker ou num servico ja rodando na maquina; se e dedicado
     a este projeto ou compartilhado com outro sistema; **quem cria** -- o humano
@@ -39,7 +43,14 @@ Aconteceu: um projeto novo foi apontado para o banco de producao de outro
 sistema, e as migrations seguintes criariam as tabelas la dentro. Esta e uma
 pergunta a fazer, nao um default a adotar -- criar banco exige privilegio que o
 agente pode nao ter, e escolher por ele significa escolher errado em silencio.
-- Escrever/atualizar `.ai/project.md` com a visao geral, repositorio oficial, idioma da UI, ambiente, **onde os dados vivem** (banco/schema, dedicado ou compartilhado, quem cria, usuario da aplicacao) e link para `.ai/stack.md` e `.ai/guidelines/domain/business-rules/index.md`. O destino dos dados fica escrito: e o que o executor le em vez de deduzir do ambiente.
+- Escrever/atualizar `.ai/project.md` com a visao geral, repositorio oficial,
+  idioma da UI, ambiente, **onde a aplicacao e publicada** (dominio, porta,
+  servidor ou servico, conta/projeto cloud e quem provisiona), **onde os dados
+  vivem** (banco/schema, dedicado ou compartilhado, quem cria, usuario da
+  aplicacao) e link para `.ai/stack.md` e
+  `.ai/guidelines/domain/business-rules/index.md`. Os destinos da aplicacao e
+  dos dados ficam escritos: e o que o executor le em vez de escolher entre os
+  recursos e credenciais que encontrou no ambiente.
 - Escrever/atualizar `.ai/stack.md` listando cada stack escolhida e o arquivo correspondente em `.ai/guidelines/stacks/`.
 - Para cada stack sem arquivo em `.ai/guidelines/stacks/`, criar `<stack>.md` com cabecalho e secoes sugeridas (arquitetura, padroes de codigo, banco, testes, frontend), a serem preenchidas ao longo do projeto.
 - Criar/atualizar arquivos em `.ai/guidelines/domain/business-rules/<tema>.md` por assunto, e manter `index.md` como indice (tema -> arquivo).

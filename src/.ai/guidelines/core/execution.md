@@ -18,9 +18,10 @@
   "ja existe e nao fui eu que criei" significa **parar**. Nao escreva credencial
   de conexao, nao rode migration e nao aponte o projeto para um recurso so
   porque conseguiu acesso a ele -- veja
-  `.ai/guidelines/core/database.md#o-banco-nao-se-adota`. Credencial encontrada
-  no ambiente nao e autorizacao de uso, e ausencia do recurso e pergunta ao
-  humano, nao problema a contornar.
+  `.ai/guidelines/core/database.md#o-banco-nao-se-adota` para banco e
+  `.ai/guidelines/core/external-resources.md` para bucket, cache, fila, indice
+  de busca e conta cloud. Credencial encontrada no ambiente nao e autorizacao de
+  uso, e ausencia do recurso e pergunta ao humano, nao problema a contornar.
 - Antes de encerrar task executavel, confirme o checklist de PR:
   - branch propria da task existe e nao e branch de PR ja mergeado;
   - branch foi enviada para `origin`;
