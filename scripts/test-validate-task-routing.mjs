@@ -10,7 +10,7 @@
 // testemunha no git e evidencia de execucao.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -299,4 +299,75 @@ test('campo de modelo vazio continua sendo erro, mesmo em R1', () => {
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, /must record the model the gateway reported/);
     });
+});
+
+// ------------------------------------- meta.json guarda o pedido, nao a resposta
+
+// `meta.json.model` e o eco de `--model`, que na schema 3 e o combo. Enquanto o
+// validador o comparava com `model` da task, o campo nao tinha valor possivel
+// numa entrada com run_id: o modelo real divergia do combo aqui, o combo era
+// recusado como "nome de combo em vez do modelo que respondeu", e `unknown` nao
+// fecha gate em R2/R3. Um Orchestrator preso nesse beco escreveu um nome
+// plausivel, que era a unica coisa que ninguem conseguia provar errada de
+// imediato. Estes testes existem para o beco nao voltar.
+function comRunDir({ metaModel, taskCombo, taskModel, observed }, assertions) {
+  const directory = mkdtempSync(path.join(tmpdir(), 'l-nexus-run-'));
+  try {
+    const runId = '20260922T180427Z-reviewer-1-829360';
+    const runDir = path.join(directory, '.lnx', 'runtime', 'task_v3_r1', runId);
+    mkdirSync(runDir, { recursive: true });
+    writeFileSync(path.join(runDir, 'meta.json'), JSON.stringify({
+      schema: 1, run_id: runId, task: 'task_v3_r1', role: 'reviewer',
+      model: metaModel, runner: 'runner-a',
+    }));
+    writeFileSync(path.join(runDir, 'exit-code'), '0');
+    if (observed) writeFileSync(path.join(runDir, 'observed-model'), observed);
+
+    const taskPath = path.join(directory, 'task.md');
+    writeFileSync(taskPath, readFileSync(taskFixture('v3-r1-valid.md'), 'utf8').replace(
+      /^model_execution:[\s\S]*$/m,
+      'model_execution:\n'
+      + '  executor:\n    combo: "combo-executor"\n    model: "modelo-que-executou"\n'
+      + '  reviews:\n'
+      + `    - combo: "${taskCombo}"\n      model: "${taskModel}"\n`
+      + `      runner: "runner-a"\n      run_id: "${runId}"\n`
+      + '      verdict: "approved"\n      findings: "sem achados"\n'
+      + '      commit: "abc1234"\n      reviewed_at: "2026-09-21 09:30"\n---\n\n# x\n'));
+
+    assertions(validate({
+      taskPath, extra: ['--runtime-root', path.join(directory, '.lnx', 'runtime')],
+    }));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+test('o modelo real na task convive com o combo no meta.json do run', () => {
+  comRunDir({
+    metaModel: 'combo-reviewer', taskCombo: 'combo-reviewer',
+    taskModel: 'modelo-que-revisou', observed: 'modelo-que-revisou',
+  }, (result) => {
+    assert.equal(result.status, 0, result.stderr);
+  });
+});
+
+test('combo divergente entre task e registro do run e recusado', () => {
+  comRunDir({
+    metaModel: 'combo-reviewer', taskCombo: 'combo-executor',
+    taskModel: 'modelo-que-revisou', observed: 'modelo-que-revisou',
+  }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /records combo combo-reviewer, but the task declares combo-executor/);
+  });
+});
+
+// A prova de quem respondeu continua sendo o observado, e ela nao afrouxou.
+test('modelo observado divergente do declarado continua sendo recusado', () => {
+  comRunDir({
+    metaModel: 'combo-reviewer', taskCombo: 'combo-reviewer',
+    taskModel: 'outro-modelo', observed: 'modelo-que-revisou',
+  }, (result) => {
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /ran on modelo-que-revisou, not on the declared outro-modelo/);
+  });
 });
