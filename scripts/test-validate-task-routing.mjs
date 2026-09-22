@@ -266,3 +266,37 @@ test('recusa roteamento em schema anterior e manda migrar', () => {
     assert.match(result.stderr, /migrate-routing/);
   });
 });
+
+// ------------------------------------------------- `unknown` e registro, nao falha
+
+// O kit sempre mandou registrar `unknown` quando o runtime nao expoe o modelo, e
+// o validador reprovava `unknown` junto com o campo vazio. O agente ficava entre
+// uma regra que manda dizer a verdade e um gate que so aceita mentira plausivel
+// -- e escolheu a mentira: um Orchestrator escreveu o `default_model` do runner
+// para fechar a task. Estes tres testes existem para essa porta nao fechar de
+// novo.
+test('R1 aceita model unknown, porque ali nao ha disjuncao a provar', () => {
+  comTask('v3-r1-valid.md', (t) => t.replace('model: "modelo-que-executou"', 'model: "unknown"'),
+    (result) => {
+      assert.equal(result.status, 0, result.stderr);
+      assert.match(result.stderr, /is unknown: nobody observed which model answered/);
+    });
+});
+
+test('R3 recusa model unknown, porque sem saber quem respondeu nao ha disjuncao', () => {
+  comTask('v3-r3-valid.md', (t) => t.replace('model: "modelo-que-executou"', 'model: "unknown"'),
+    (result) => {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /is unknown, and this risk level needs the roles served by different models/);
+    });
+});
+
+// "Nao observei" e uma afirmacao; campo vazio nao afirma nada. Tratar os dois
+// igual foi o que criou a armadilha.
+test('campo de modelo vazio continua sendo erro, mesmo em R1', () => {
+  comTask('v3-r1-valid.md', (t) => t.replace('model: "modelo-que-executou"', 'model: ""'),
+    (result) => {
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /must record the model the gateway reported/);
+    });
+});

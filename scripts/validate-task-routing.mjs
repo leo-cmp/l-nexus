@@ -405,6 +405,13 @@ function writePlanHash(taskPath) {
   return hash;
 }
 
+// Dizer `unknown` e uma afirmacao -- "ninguem observou" -- e nao a ausencia de
+// uma. Campo vazio nao afirma nada, e por isso os dois nao podem ser tratados
+// igual.
+function declaresUnknown(value) {
+  return typeof value === 'string' && value.trim().toLowerCase() === 'unknown';
+}
+
 function valueIsKnown(value) {
   return typeof value === 'string' && value.trim() !== '' && value.trim().toLowerCase() !== 'unknown';
 }
@@ -661,7 +668,21 @@ function validatePlannedRole(errors, plan, role, routing, riskLevel, { required 
 // O registro de execucao e o unico lugar onde existe modelo de verdade: o nome
 // vem do campo `model` da RESPOSTA do gateway, nao do que o modelo diz de si e
 // nao do plano. Por isso ele e prova, e nao repeticao do que ja foi planejado.
-function validateExecutionRecord(errors, warnings, record, field, routing) {
+// `requireKnownModel` separa as duas coisas que este campo pode dizer. A regra
+// do kit sempre foi "registre `unknown` quando o runtime nao expuser o modelo;
+// nunca deduza" -- so que o validador reprovava `unknown` junto com o vazio, e
+// entao a unica saida que passava no gate era inventar um nome plausivel. Foi o
+// que aconteceu: um Orchestrator escreveu o modelo default do runner porque a
+// resposta honesta nao fechava a task. O kit mandava dizer a verdade e travava
+// a porta dela.
+//
+// Agora `unknown` e registro valido de que ninguem observou, e vale como aviso.
+// Onde a rota exige que os papeis caiam em modelos distintos, ele volta a ser
+// erro -- sem saber quem respondeu nao ha como provar disjuncao, e e ali que o
+// kit ja dizia nao aceitar `unknown`. Campo vazio ou ausente segue sendo erro
+// em qualquer nivel: "nao observei" e diferente de "nao preenchi".
+function validateExecutionRecord(errors, warnings, record, field, routing,
+  { requireKnownModel = false } = {}) {
   if (!isObject(record)) { addError(errors, field, 'must be a mapping'); return; }
   // Registro anterior a schema 3 nao tem combo porque o kit pedia o modelo
   // direto. O que importa aqui -- quem respondeu -- ele ja tem.
@@ -670,7 +691,17 @@ function validateExecutionRecord(errors, warnings, record, field, routing) {
   } else if (record.combo !== undefined && !isObject(routing.combos?.[record.combo])) {
     addError(errors, `${field}.combo`, `must reference a declared routing.combos entry (${record.combo})`);
   }
-  if (!valueIsKnown(record.model)) {
+  if (declaresUnknown(record.model)) {
+    if (requireKnownModel) {
+      addError(errors, `${field}.model`,
+        'is unknown, and this risk level needs the roles served by different models; '
+        + 'configure lnx-run.sh with --observe-bin so the run records who answered');
+    } else {
+      addWarning(warnings, `${field}.model`,
+        'is unknown: nobody observed which model answered. Honest, but it proves nothing — '
+        + '--observe-bin records it');
+    }
+  } else if (!valueIsKnown(record.model)) {
     addError(errors, `${field}.model`,
       'must record the model the gateway reported in the response, not the combo name');
   } else if (isObject(routing.combos?.[record.model])) {
@@ -753,17 +784,21 @@ function validateTask(task, routing, finalCommit, errors, warnings, context) {
     }
     return;
   }
-  validateExecutionRecord(errors, warnings, execution.executor, 'task.model_execution.executor', routing);
+  const exigeModeloConhecido = route.independent_model === true;
+  validateExecutionRecord(errors, warnings, execution.executor,
+    'task.model_execution.executor', routing, { requireKnownModel: exigeModeloConhecido });
 
   for (const [indice, entrada] of (execution.tests ?? []).entries()) {
-    validateExecutionRecord(errors, warnings, entrada, `task.model_execution.tests[${indice}]`, routing);
+    validateExecutionRecord(errors, warnings, entrada, `task.model_execution.tests[${indice}]`, routing,
+      { requireKnownModel: exigeModeloConhecido });
     if (!TEST_VERDICTS.has(entrada?.verdict)) {
       addError(errors, `task.model_execution.tests[${indice}].verdict`,
         `must be one of ${[...TEST_VERDICTS].join(', ')}`);
     }
   }
   for (const [indice, entrada] of (execution.reviews ?? []).entries()) {
-    validateExecutionRecord(errors, warnings, entrada, `task.model_execution.reviews[${indice}]`, routing);
+    validateExecutionRecord(errors, warnings, entrada, `task.model_execution.reviews[${indice}]`, routing,
+      { requireKnownModel: exigeModeloConhecido });
     if (!REVIEW_VERDICTS.has(entrada?.verdict)) {
       addError(errors, `task.model_execution.reviews[${indice}].verdict`,
         `must be one of ${[...REVIEW_VERDICTS].join(', ')}`);
